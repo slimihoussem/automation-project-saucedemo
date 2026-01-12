@@ -1,19 +1,24 @@
 pipeline {
     agent any
 
-    tools {
-        nodejs 'NodeJS_24'  // Assurez-vous que NodeJS est configuré dans Jenkins
-    }
-
     environment {
-        // URL de l'application à tester
+        // Utiliser le NodeJS déjà installé
         BASE_URL = 'http://localhost:8080'
-        // Configuration pour Playwright
-        PLAYWRIGHT_BROWSERS_PATH = '0'  // Télécharge les navigateurs
-        CI = 'true'  // Mode CI activé
+        CI = 'true'
     }
 
     stages {
+        stage('Vérification de NodeJS') {
+            steps {
+                bat """
+                    echo "✅ NodeJS version:"
+                    node --version
+                    echo "✅ NPM version:"
+                    npm --version
+                """
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout([
@@ -21,58 +26,69 @@ pipeline {
                     branches: [[name: '*/main']],
                     userRemoteConfigs: [[
                         url: 'https://github.com/slimihoussem/automation-project-saucedemo/',
-                        credentialsId: 'github_cred'  // Vos credentials GitHub
+                        credentialsId: 'github_cred'
                     ]]
                 ])
-                // Vérifier le contenu du répertoire
+                
+                // Afficher le contenu du répertoire pour vérifier
                 bat 'dir'
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Installation des dépendances') {
             steps {
                 script {
                     // Vérifier si package.json existe
                     if (fileExists('package.json')) {
-                        bat 'npm ci'  // Utilise npm ci pour des installations propres en CI
+                        bat 'npm ci'
                     } else {
-                        error('package.json not found!')
+                        error('❌ Fichier package.json non trouvé !')
                     }
                 }
             }
         }
 
-        stage('Install Playwright Browsers') {
+        stage('Installation de Playwright') {
             steps {
-                bat 'npx playwright install --with-deps chromium'
+                bat """
+                    echo "🎭 Installation des navigateurs Playwright..."
+                    npx playwright install --with-deps chromium
+                """
             }
         }
 
-        stage('Run Tests on Localhost:8080') {
+        stage('Vérification de localhost:8080') {
             steps {
-                script {
-                    // Vérifier que localhost:8080 est accessible
-                    bat 'timeout 5 && curl -f http://localhost:8080 || echo "⚠️  Localhost:8080 not accessible, but continuing..."'
-                    
-                    // Exécuter les tests
-                    bat """
-                        set BASE_URL=http://localhost:8080
-                        npx playwright test --reporter=html,line --output=playwright-report
-                    """
-                }
+                bat """
+                    echo "🔍 Vérification de la disponibilité de l'application..."
+                    timeout /t 5
+                    curl -f http://localhost:8080 || echo "⚠️  L'application n'est pas encore démarrée"
+                """
             }
         }
 
-        stage('Generate and Publish Report') {
+        stage('Exécution des tests') {
             steps {
-                // Générer le rapport
-                bat 'npx playwright show-report playwright-report || echo "Report generation failed"'
+                bat """
+                    echo "🧪 Lancement des tests Playwright..."
+                    set BASE_URL=http://localhost:8080
+                    npx playwright test --reporter=html,line --output=playwright-report
+                """
+            }
+        }
+
+        stage('Génération du rapport') {
+            steps {
+                bat """
+                    echo "📊 Génération du rapport..."
+                    npx playwright show-report playwright-report || echo "Le rapport est généré"
+                """
                 
                 // Publier le rapport HTML
                 publishHTML([
                     reportDir: 'playwright-report',
                     reportFiles: 'index.html',
-                    reportName: 'Playwright Test Report',
+                    reportName: 'Rapport Playwright',
                     alwaysLinkToLastBuild: true,
                     keepAll: true
                 ])
@@ -85,17 +101,19 @@ pipeline {
 
     post {
         always {
-            echo "✅ Pipeline execution completed"
-            // Nettoyage
-            bat 'rm -rf node_modules || echo "Cleanup done"'
-        }
-        failure {
-            echo "❌ Some tests failed!"
-            // Capturer les screenshots en cas d'échec
-            archiveArtifacts artifacts: 'test-results/**/*', allowEmptyArchive: true
+            echo "🏁 Pipeline terminé"
+            // Capturer les logs de sortie
+            bat 'dir playwright-report /s 2>nul || echo "Aucun rapport généré"'
         }
         success {
-            echo "🎉 All tests passed successfully!"
+            echo "✅ Tous les tests ont réussi !"
+            // Archiver également les résultats
+            archiveArtifacts artifacts: 'test-results/**/*', allowEmptyArchive: true
+        }
+        failure {
+            echo "❌ Certains tests ont échoué !"
+            // Archiver les screenshots en cas d'échec
+            archiveArtifacts artifacts: 'playwright-report/**/*, test-results/**/*', allowEmptyArchive: true
         }
     }
 }
