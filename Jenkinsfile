@@ -24,17 +24,17 @@ pipeline {
             }
         }
 
-        stage('Installation de Playwright') {
+        stage('Installation de Playwright (tous les navigateurs)') {
             steps {
-                bat 'npx playwright install chromium'
+                bat 'npx playwright install --with-deps'
             }
         }
 
-        stage('Exécution des tests sur saucedemo.com') {
+        stage('Exécution des tests (Chromium uniquement)') {
             steps {
                 bat '''
                     echo "🧪 Lancement des tests sur saucedemo.com..."
-                    npx playwright test --reporter=html --output=playwright-report
+                    npx playwright test --reporter=html --output=playwright-report --project=chromium
                 '''
             }
         }
@@ -58,8 +58,6 @@ pipeline {
     post {
         always {
             echo "🏁 Pipeline terminé"
-            // Nettoyage optionnel
-            bat 'rmdir /s /q node_modules 2>nul || echo "Nettoyage effectué"'
         }
         success {
             echo "✅ Tous les tests ont réussi !"
