@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     stages {
-        stage('Vérification des outils') {
+        stage('Vérification des outils ') {
             steps {
                 bat '''
                     echo "📋 Vérification des outils..."
