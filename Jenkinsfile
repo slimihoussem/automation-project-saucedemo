@@ -1,94 +1,50 @@
 pipeline {
     agent any
 
-    environment {
-        // Utiliser le NodeJS déjà installé
-        BASE_URL = 'http://localhost:8080'
-        CI = 'true'
-    }
-
     stages {
-        stage('Vérification de NodeJS') {
+        stage('Vérification des outils') {
             steps {
-                bat """
-                    echo "✅ NodeJS version:"
+                bat '''
+                    echo "📋 Vérification des outils..."
                     node --version
-                    echo "✅ NPM version:"
                     npm --version
-                """
+                '''
             }
         }
 
-        stage('Checkout') {
+        stage('Checkout du code') {
             steps {
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    userRemoteConfigs: [[
-                        url: 'https://github.com/slimihoussem/automation-project-saucedemo/',
-                        credentialsId: 'github_cred'
-                    ]]
-                ])
-                
-                // Afficher le contenu du répertoire pour vérifier
-                bat 'dir'
+                checkout scm
             }
         }
 
         stage('Installation des dépendances') {
             steps {
-                script {
-                    // Vérifier si package.json existe
-                    if (fileExists('package.json')) {
-                        bat 'npm ci'
-                    } else {
-                        error('❌ Fichier package.json non trouvé !')
-                    }
-                }
+                bat 'npm ci'
             }
         }
 
         stage('Installation de Playwright') {
             steps {
-                bat """
-                    echo "🎭 Installation des navigateurs Playwright..."
-                    npx playwright install --with-deps chromium
-                """
+                bat 'npx playwright install chromium'
             }
         }
 
-        stage('Vérification de localhost:8080') {
+        stage('Exécution des tests sur saucedemo.com') {
             steps {
-                bat """
-                    echo "🔍 Vérification de la disponibilité de l'application..."
-                    timeout /t 5
-                    curl -f http://localhost:8080 || echo "⚠️  L'application n'est pas encore démarrée"
-                """
+                bat '''
+                    echo "🧪 Lancement des tests sur saucedemo.com..."
+                    npx playwright test --reporter=html --output=playwright-report
+                '''
             }
         }
 
-        stage('Exécution des tests') {
+        stage('Publication du rapport') {
             steps {
-                bat """
-                    echo "🧪 Lancement des tests Playwright..."
-                    set BASE_URL=http://localhost:8080
-                    npx playwright test --reporter=html,line --output=playwright-report
-                """
-            }
-        }
-
-        stage('Génération du rapport') {
-            steps {
-                bat """
-                    echo "📊 Génération du rapport..."
-                    npx playwright show-report playwright-report || echo "Le rapport est généré"
-                """
-                
-                // Publier le rapport HTML
                 publishHTML([
                     reportDir: 'playwright-report',
                     reportFiles: 'index.html',
-                    reportName: 'Rapport Playwright',
+                    reportName: 'Rapport Playwright - SauceDemo',
                     alwaysLinkToLastBuild: true,
                     keepAll: true
                 ])
@@ -102,18 +58,16 @@ pipeline {
     post {
         always {
             echo "🏁 Pipeline terminé"
-            // Capturer les logs de sortie
-            bat 'dir playwright-report /s 2>nul || echo "Aucun rapport généré"'
+            // Nettoyage optionnel
+            bat 'rmdir /s /q node_modules 2>nul || echo "Nettoyage effectué"'
         }
         success {
             echo "✅ Tous les tests ont réussi !"
-            // Archiver également les résultats
-            archiveArtifacts artifacts: 'test-results/**/*', allowEmptyArchive: true
         }
         failure {
-            echo "❌ Certains tests ont échoué !"
-            // Archiver les screenshots en cas d'échec
-            archiveArtifacts artifacts: 'playwright-report/**/*, test-results/**/*', allowEmptyArchive: true
+            echo "❌ Certains tests ont échoué"
+            // Archiver les logs d'erreur
+            archiveArtifacts artifacts: 'test-results/**/*', allowEmptyArchive: true
         }
     }
 }
