@@ -41,13 +41,14 @@ pipeline {
 
         stage('Publication du rapport') {
             steps {
-                // Avec le plugin HTML Publisher installé
+                // Version avec allowMissing (plugin HTML Publisher récent)
                 publishHTML([
                     reportDir: 'playwright-report',
                     reportFiles: 'index.html',
-                    reportName: 'Rapport Playwright - SauceDemo',
+                    reportName: 'Rapport Playwright',
                     alwaysLinkToLastBuild: true,
-                    keepAll: true
+                    keepAll: true,
+                    allowMissing: true  // <-- AJOUTEZ CE PARAMÈTRE
                 ])
                 
                 archiveArtifacts artifacts: 'playwright-report/**/*', allowEmptyArchive: true
