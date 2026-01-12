@@ -1,7 +1,7 @@
 pipeline {
     agent any
 
-    // This enables GitHub webhook triggering
+    // This enables GitHub  webhook triggering
     triggers {
         // For GitHub webhooks
         githubPush()
