@@ -43,14 +43,11 @@ pipeline {
 
     post {
         always {
-            // Archive artifacts doit être dans un node context
-            node {
-                archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
-                echo "✅ Pipeline terminé"
-            }
+            echo "✅ Pipeline terminé"
+            archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
         }
         failure {
-            echo "❌ Certains tests ont échoué !"
+            echo "❌ Certains tests Playwright ont échoué !"
         }
     }
 }
