@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        NODE_HOME = tool name: 'NodeJS_24', type: 'NodeJS'
+        NODE_HOME = tool name: 'NodeJS_24', type: 'NodeJS' // Assure-toi que NodeJS_24 existe
         PATH = "${env.NODE_HOME}/bin:${env.PATH}"
     }
 
@@ -15,7 +15,7 @@ pipeline {
 
         stage('Install Node & Playwright') {
             steps {
-                sh """
+                bat """
                     npm install
                     npx playwright install
                 """
@@ -24,7 +24,7 @@ pipeline {
 
         stage('Run Playwright Tests') {
             steps {
-                sh """
+                bat """
                     npx playwright test --reporter=html --output=reports/playwright
                 """
             }
