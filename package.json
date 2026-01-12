@@ -1,0 +1,23 @@
+{
+  "name": "automation-project-saucedemo",
+  "version": "1.0.0",
+  "description": "Projet d'automatisation de tests pour Saucedemo.com",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slimihoussem/automation-project-saucedemo.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/slimihoussem/automation-project-saucedemo/issues"
+  },
+  "homepage": "https://github.com/slimihoussem/automation-project-saucedemo#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.6"
+  }
+}
