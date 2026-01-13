@@ -3,6 +3,7 @@ import { test, expect, BrowserContext, Page } from '@playwright/test';
 let context: BrowserContext;
 let page: Page;
 
+
 test.beforeAll(async ({ browser }) => {
   // 1️⃣ Hook beforeAll : connexion utilisateur standard
   context = await browser.newContext();
