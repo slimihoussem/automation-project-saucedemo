@@ -52,6 +52,24 @@ export default defineConfig({
       use: { ...devices['Desktop Safari'] },
     },
 
+      timeout: 30 * 1000, // ⏱ Timeout global : 30s
+
+  expect: {
+    timeout: 5000, // Timeout des assertions
+  },
+
+  reporter: [
+    ['list'],
+    ['html', { open: 'never' }] // 📊 Rapport HTML
+  ],
+
+  use: {
+    headless: true, // 👻 Mode headless
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    trace: 'on-first-retry',
+    baseURL: 'https://www.saucedemo.com',
+  },
     /* Test against mobile viewports. */
     // {
     //   name: 'Mobile Chrome',
