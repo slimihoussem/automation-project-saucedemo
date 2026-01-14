@@ -2,14 +2,3 @@
 selenium>=4.39.0
 robotframework>=6.1.1
 robotframework-seleniumlibrary>=6.8.0
-
-# Testing frameworks
-pytest>=7.4.3
-pytest-html>=4.1.1
-
-# WebDriver management
-webdriver-manager>=4.0.1
-
-# Optional: For better reporting
-# pytest-xdist>=3.0
-# allure-pytest>=2.13.0
