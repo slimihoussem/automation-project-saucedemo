@@ -11,30 +11,27 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    docker.build("playwright-chromium")
-                }
+                bat 'docker build -t playwright-chromium .'
             }
         }
 
         stage('Run Playwright Tests (Chromium)') {
             steps {
-                script {
-                    docker.image("playwright-chromium").inside {
-                        sh 'npx playwright test --project=chromium'
-                    }
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
-                }
+                bat '''
+                docker run --rm ^
+                  -v "%cd%\\reports:/app/reports" ^
+                  -v "%cd%\\test-results:/app/test-results" ^
+                  playwright-chromium
+                '''
             }
         }
     }
 
     post {
+        always {
+            archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
+        }
         success {
             echo '✅ Playwright Chromium tests passed'
         }
