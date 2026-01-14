@@ -1,18 +1,8 @@
 // @ts-check
 import { defineConfig, devices } from '@playwright/test';
 
-/**
- * Read environment variables from file.
- * https://github.com/motdotla/dotenv
- */
-// import dotenv from 'dotenv';
-// import path from 'path';
-// dotenv.config({ path: path.resolve(__dirname, '.env') });
-
-/**
- * @see https://playwright.dev/docs/test-configuration
- */
 export default defineConfig({
+<<<<<<< HEAD
   testDir: './playwright_tests/',
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -30,27 +20,57 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
      baseURL: 'https://www.saucedemo.com',
+=======
+>>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
 
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
+  testDir: './playwright_tests',
+
+  /* ⏱ Timeout global */
+  timeout: 30 * 1000,
+
+  expect: {
+    timeout: 5000,
+  },
+
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+
+  /* 📊 Reporter HTML (Jenkins-friendly) */
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'reports', open: 'never' }],
+  ],
+
+  /* ⚙️ Paramètres communs */
+  use: {
+    headless: true,                 // ✅ OBLIGATOIRE pour Jenkins
+    baseURL: 'https://www.saucedemo.com',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
     trace: 'on-first-retry',
   },
 
-  /* Configure projects for major browsers */
+  /* 🌐 Navigateurs */
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+<<<<<<< HEAD
 /*
+=======
+>>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
     },
-
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
+<<<<<<< HEAD
 */
     /* Test against mobile viewports. */
     // {
@@ -71,13 +91,7 @@ export default defineConfig({
     //   name: 'Google Chrome',
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
+=======
+>>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
   ],
-
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
 });
-
