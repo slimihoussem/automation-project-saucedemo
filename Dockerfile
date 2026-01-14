@@ -1,32 +1,18 @@
-# Use multi-stage build for speed
-FROM python:3.11-slim AS base
-
-# Install only what's needed
-ARG INSTALL_PYTHON=false
-ARG INSTALL_PLAYWRIGHT=false
+FROM mcr.microsoft.com/playwright:v1.42.1-jammy
 
 WORKDIR /app
 
-# Copy minimal files first
-COPY requirements.txt .
-COPY package.json .
-
-# Conditional Python installation
-RUN if [ "$INSTALL_PYTHON" = "true" ]; then \
-        pip install --no-cache-dir -r requirements.txt; \
-    fi
-
-# Conditional Playwright installation
-RUN if [ "$INSTALL_PLAYWRIGHT" = "true" ]; then \
-        apt-get update && apt-get install -y curl && \
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-        apt-get install -y nodejs && \
-        npm ci --omit=optional && \
-        npx playwright install chromium; \
-    fi
-
-# Final stage
-FROM base AS final
+# Copy project as-is
 COPY . .
 
-CMD ["echo", "Optimized test container ready"]
+# Install Python requirements if present
+RUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi
+
+# Install Node dependencies (uses your existing package-lock.json)
+RUN npm ci
+
+# Install ONLY Chromium
+RUN npx playwright install chromium --with-deps
+
+# Default command: run tests ONLY on Chromium
+CMD ["npx", "playwright", "test", "--project=chromium"]
