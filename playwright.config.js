@@ -2,7 +2,6 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
-<<<<<<< HEAD
   testDir: './playwright_tests/',
   /* Run tests in files in parallel */
   fullyParallel: true,
@@ -20,8 +19,6 @@ export default defineConfig({
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
      baseURL: 'https://www.saucedemo.com',
-=======
->>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
 
   testDir: './playwright_tests',
 
@@ -58,10 +55,7 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-<<<<<<< HEAD
 /*
-=======
->>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
@@ -70,7 +64,6 @@ export default defineConfig({
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
     },
-<<<<<<< HEAD
 */
     /* Test against mobile viewports. */
     // {
@@ -91,7 +84,6 @@ export default defineConfig({
     //   name: 'Google Chrome',
     //   use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     // },
-=======
->>>>>>> 1072c9fe42c41e21cafe15cfed7919ecd10c17f6
+
   ],
 });

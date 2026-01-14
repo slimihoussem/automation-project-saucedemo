@@ -1,30 +1,32 @@
-FROM python:3.11-slim
+# Use multi-stage build for speed
+FROM python:3.11-slim AS base
 
-# Install Node.js and dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    wget \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Install only what's needed
+ARG INSTALL_PYTHON=false
+ARG INSTALL_PLAYWRIGHT=false
 
 WORKDIR /app
 
-# Copy ALL files
+# Copy minimal files first
+COPY requirements.txt .
+COPY package.json .
+
+# Conditional Python installation
+RUN if [ "$INSTALL_PYTHON" = "true" ]; then \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
+
+# Conditional Playwright installation
+RUN if [ "$INSTALL_PLAYWRIGHT" = "true" ]; then \
+        apt-get update && apt-get install -y curl && \
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+        apt-get install -y nodejs && \
+        npm ci --omit=optional && \
+        npx playwright install chromium; \
+    fi
+
+# Final stage
+FROM base AS final
 COPY . .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Playwright from ROOT package.json (not playwright_tests/)
-RUN npm ci
-RUN npx playwright install --with-deps
-
-# Show directory structure (for debugging)
-RUN echo "=== Directory Structure ===" && \
-    ls -la && \
-    echo "=== Test Directories ===" && \
-    ls -la robot_tests/ selenium_tests/ playwright_tests/ 2>/dev/null || echo "Some directories may not exist"
-
-CMD ["bash", "-c", "echo 'Container ready. Run tests with:' && echo '1. robot: cd /app/robot_tests && robot .' && echo '2. selenium: cd /app/selenium_tests && python -m pytest .' && echo '3. playwright: cd /app && npx playwright test'"]
+CMD ["echo", "Optimized test container ready"]
