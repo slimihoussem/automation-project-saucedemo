@@ -2,7 +2,14 @@ pipeline {
     agent any
 
     environment {
+        // Virtual environment folder
         VENV_DIR = "${WORKSPACE}\\venv"
+        NODE_MODULES = "${WORKSPACE}\\node_modules"
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
     }
 
     stages {
@@ -16,7 +23,7 @@ pipeline {
         stage('Setup Python Environment') {
             steps {
                 echo 'Creating Python virtual environment...'
-                bat "python -m venv %VENV_DIR%"
+                bat 'py -m venv %VENV_DIR%'
                 echo 'Installing Python dependencies...'
                 bat """
                     call %VENV_DIR%\\Scripts\\activate
@@ -40,7 +47,7 @@ pipeline {
                     call %VENV_DIR%\\Scripts\\activate
                     pytest selenium_tests --junitxml=test-results\\selenium-results.xml
                 """
-                
+
                 echo 'Running Robot Framework tests...'
                 bat """
                     call %VENV_DIR%\\Scripts\\activate
@@ -49,6 +56,7 @@ pipeline {
             }
             post {
                 always {
+                    echo 'Archiving Selenium and Robot Framework test results...'
                     junit 'test-results/*.xml'
                     archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
                 }
@@ -63,6 +71,7 @@ pipeline {
             }
             post {
                 always {
+                    echo 'Archiving Playwright test results...'
                     archiveArtifacts artifacts: 'playwright_tests\\test-results/**', allowEmptyArchive: true
                 }
             }
@@ -74,10 +83,10 @@ pipeline {
             echo 'Pipeline finished.'
         }
         success {
-            echo 'All tests passed!'
+            echo '✅ All tests passed!'
         }
         failure {
-            echo 'Some tests failed.'
+            echo '❌ Some tests failed.'
         }
     }
 }
