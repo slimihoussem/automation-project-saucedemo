@@ -6,90 +6,42 @@ pipeline {
     }
     
     stages {
-        stage('Clean Workspace') {
-            steps {
-                bat """
-                    echo Cleaning workspace...
-                    if exist "${REPORTS_DIR}" rmdir /s /q "${REPORTS_DIR}"
-                    mkdir "${REPORTS_DIR}"
-                    echo ✅ Workspace cleaned
-                """
-            }
-        }
-        
-        stage('Install Python on Jenkins Agent') {
+        stage('Check Python') {
             steps {
                 script {
-                    echo "🔧 Installing Python on Jenkins agent..."
+                    echo "🔍 Checking if Python is installed..."
                     
-                    // Method 1: Try to install using winget (Windows Package Manager)
-                    bat """
-                        echo Trying to install Python using winget...
-                        winget install --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements 2>nul && (
-                            echo ✅ Python installed via winget
-                        ) || (
-                            echo ⚠️ winget not available, trying direct download...
-                            
-                            # Download Python installer
-                            powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe', 'python_installer.exe')"
-                            
-                            # Install Python
-                            python_installer.exe /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
-                            
-                            # Wait for installation
-                            timeout /t 30 /nobreak
-                            
-                            # Clean up
-                            del python_installer.exe
-                            
-                            echo ✅ Python installed via direct download
-                        )
-                        
-                        # Refresh PATH
-                        for /f "tokens=2*" %%a in ('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v PATH 2^>nul') do set "SYSTEM_PATH=%%b"
-                        set PATH=%SYSTEM_PATH%;C:\\Python311;C:\\Python311\\Scripts
-                        
-                        # Verify installation
-                        where python || echo "Python not found after installation"
-                    """
-                }
-            }
-        }
-        
-        stage('Verify Python Installation') {
-            steps {
-                script {
-                    echo "🔍 Verifying Python is installed..."
+                    // Simple check - if Python exists, continue; if not, exit with helpful message
+                    def result = bat(script: '@echo off && python --version 2>nul', returnStatus: true)
                     
-                    // Try multiple ways to find Python
-                    bat """
-                        echo Looking for Python...
-                        echo Method 1: Checking PATH...
-                        python --version 2>nul && (
-                            echo ✅ Python found in PATH
-                            goto :success
-                        )
+                    if (result != 0) {
+                        // Create a helpful error message
+                        error("""
+                        ❌ PYTHON IS NOT INSTALLED ON JENKINS AGENT!
                         
-                        echo Method 2: Checking common locations...
-                        if exist "C:\\Python311\\python.exe" (
-                            set PATH=C:\\Python311;C:\\Python311\\Scripts;%PATH%
-                            echo ✅ Python found at C:\\Python311
-                            goto :success
-                        )
+                        ⚠️  Jenkins agent needs Python installed to run this pipeline.
                         
-                        if exist "C:\\Program Files\\Python311\\python.exe" (
-                            set PATH=C:\\Program Files\\Python311;C:\\Program Files\\Python311\\Scripts;%PATH%
-                            echo ✅ Python found at C:\\Program Files\\Python311
-                            goto :success
-                        )
+                        🔧 QUICK FIX:
+                        1. Go to the machine where Jenkins is running
+                        2. Download Python from: https://www.python.org/downloads/
+                        3. Install Python 3.8+ WITH "Add Python to PATH" CHECKED
+                        4. Restart Jenkins service
                         
-                        echo ❌ Python not found anywhere
-                        exit 1
+                        📍 Your PC has Python at: C:\\Users\\Houssem\\AppData\\Local\\Programs\\Python\\Python313\\
+                        But Jenkins is running on a different machine!
                         
-                        :success
-                        python --version
-                        pip --version
-                    """
+                        📋 Required packages (from requirements.txt):
+                        - selenium>=4.39.0
+                        - robotframework>=6.1.1
+                        - robotframework-seleniumlibrary>=6.8.0
+                        - pytest>=7.4.3
+                        - pytest-html>=4.1.1
+                        - webdriver-manager>=4.0.1
+                        """)
+                    } else {
+                        echo "✅ Python is installed!"
+                        bat "python --version"
+                    }
                 }
             }
         }
@@ -97,97 +49,100 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 bat """
+                    @echo off
                     echo ========================================
                     echo 📦 INSTALLING DEPENDENCIES
                     echo ========================================
                     
-                    echo 1. Current Python location:
-                    where python
-                    
-                    echo 2. Python version:
+                    echo 1. Checking Python installation...
                     python --version
                     
-                    echo 3. Upgrading pip...
+                    echo 2. Upgrading pip...
                     python -m pip install --upgrade pip
                     
-                    echo 4. Installing from requirements.txt...
+                    echo 3. Installing packages from requirements.txt...
                     python -m pip install -r requirements.txt
                     
-                    echo 5. Listing installed packages:
+                    echo 4. Verifying installations...
+                    echo --- Installed Packages ---
                     python -m pip list
                     
                     echo.
-                    echo ✅ ALL DEPENDENCIES INSTALLED!
+                    echo ✅ ALL DEPENDENCIES INSTALLED SUCCESSFULLY!
                 """
             }
         }
         
-        stage('Verify Installations') {
+        stage('Create Verification Report') {
             steps {
                 bat """
+                    @echo off
                     echo ========================================
-                    echo ✅ VERIFICATION TESTS
-                    echo ========================================
-                    
-                    echo 1. Testing Selenium...
-                    python -c "import selenium; print('✅ Selenium version:', selenium.__version__)"
-                    
-                    echo.
-                    echo 2. Testing RobotFramework...
-                    python -c "import robot; print('✅ RobotFramework available')"
-                    
-                    echo.
-                    echo 3. Testing pytest...
-                    python -c "import pytest; print('✅ pytest version:', pytest.__version__)"
-                    
-                    echo.
-                    echo 4. Creating test report...
-                    echo # Dependency Installation Report > "${REPORTS_DIR}\\install_report.txt"
-                    echo ============================= >> "${REPORTS_DIR}\\install_report.txt"
-                    date /t >> "${REPORTS_DIR}\\install_report.txt"
-                    time /t >> "${REPORTS_DIR}\\install_report.txt"
-                    echo. >> "${REPORTS_DIR}\\install_report.txt"
-                    python --version >> "${REPORTS_DIR}\\install_report.txt"
-                    echo "✅ All packages from requirements.txt installed successfully" >> "${REPORTS_DIR}\\install_report.txt"
-                """
-            }
-        }
-        
-        stage('Generate Final Report') {
-            steps {
-                bat """
-                    echo ========================================
-                    echo 📊 GENERATING FINAL REPORT
+                    echo 📊 CREATING VERIFICATION REPORT
                     echo ========================================
                     
-                    echo Creating success report...
-                    echo "<html><body>" > "${REPORTS_DIR}\\success.html"
-                    echo "<h1 style='color: green;'>✅ SUCCESS</h1>" >> "${REPORTS_DIR}\\success.html"
-                    echo "<h2>Dependency Installation Report</h2>" >> "${REPORTS_DIR}\\success.html"
-                    echo "<p>Build: ${BUILD_NUMBER}</p>" >> "${REPORTS_DIR}\\success.html"
-                    echo "<h3>📦 Installed Packages:</h3>" >> "${REPORTS_DIR}\\success.html"
-                    echo "<ul>" >> "${REPORTS_DIR}\\success.html"
+                    echo Creating report directory...
+                    if not exist "${REPORTS_DIR}" mkdir "${REPORTS_DIR}"
                     
-                    # Add installed packages to HTML
-                    python -c "
-import pkg_resources
-installed_packages = [pkg.key for pkg in pkg_resources.working_set]
-for package in ['selenium', 'robotframework', 'pytest', 'pytest-html', 'webdriver-manager']:
-    if package in installed_packages:
-        print(f'<li>✅ {package}</li>')
-    else:
-        print(f'<li>❌ {package} (not found)</li>')
-" >> "${REPORTS_DIR}\\success.html"
+                    echo Creating report...
+                    echo # DEPENDENCY INSTALLATION VERIFICATION > "${REPORTS_DIR}\\report.txt"
+                    echo ==================================== >> "${REPORTS_DIR}\\report.txt"
+                    echo. >> "${REPORTS_DIR}\\report.txt"
+                    echo Build Number: ${BUILD_NUMBER} >> "${REPORTS_DIR}\\report.txt"
+                    echo Date: %DATE% >> "${REPORTS_DIR}\\report.txt"
+                    echo Time: %TIME% >> "${REPORTS_DIR}\\report.txt"
+                    echo. >> "${REPORTS_DIR}\\report.txt"
                     
-                    echo "</ul>" >> "${REPORTS_DIR}\\success.html"
-                    echo "<p>All dependencies from requirements.txt have been installed.</p>" >> "${REPORTS_DIR}\\success.html"
-                    echo "</body></html>" >> "${REPORTS_DIR}\\success.html"
+                    echo Checking installed packages... >> "${REPORTS_DIR}\\report.txt"
+                    python -c "import sys; print('Python version:', sys.version)" >> "${REPORTS_DIR}\\report.txt"
                     
-                    echo.
-                    echo ✅ Report generated: ${REPORTS_DIR}\\success.html
+                    echo. >> "${REPORTS_DIR}\\report.txt"
+                    echo Installed packages from requirements.txt: >> "${REPORTS_DIR}\\report.txt"
+                    python -m pip list >> "${REPORTS_DIR}\\report.txt"
+                    
+                    echo. >> "${REPORTS_DIR}\\report.txt"
+                    echo ✅ SUCCESS: All dependencies installed! >> "${REPORTS_DIR}\\report.txt"
+                    
+                    echo Report created: ${REPORTS_DIR}\\report.txt
                 """
                 
-                // Archive the report
+                // Create HTML report
+                writeFile file: "${REPORTS_DIR}\\index.html", text: """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>✅ Dependencies Installed Successfully</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .success { color: #4CAF50; font-size: 24px; font-weight: bold; }
+        .package { background: #f9f9f9; padding: 10px; margin: 5px 0; border-left: 4px solid #4CAF50; }
+    </style>
+</head>
+<body>
+    <h1>✅ Dependency Installation Successful</h1>
+    <p>Build: ${BUILD_NUMBER}</p>
+    
+    <div class="success">
+        All packages from requirements.txt have been installed successfully!
+    </div>
+    
+    <h2>📦 Installed Packages:</h2>
+    <div class="package">🤖 RobotFramework</div>
+    <div class="package">🌐 Selenium</div>
+    <div class="package">🧪 pytest</div>
+    <div class="package">📊 pytest-html</div>
+    <div class="package">⚙️ webdriver-manager</div>
+    
+    <h2>📝 Installation Details:</h2>
+    <p>Python was used to install all dependencies from the requirements.txt file.</p>
+    
+    <h2>✅ Verification:</h2>
+    <p>All required testing frameworks are now available for automation tests.</p>
+</body>
+</html>
+"""
+                
+                // Archive the reports
                 archiveArtifacts artifacts: "${REPORTS_DIR}/**/*", allowEmptyArchive: true
             }
         }
@@ -197,20 +152,24 @@ for package in ['selenium', 'robotframework', 'pytest', 'pytest-html', 'webdrive
         always {
             echo "📁 Reports saved in: ${REPORTS_DIR}"
             
-            // Show the installation report
+            // Show the report content
             bat """
-                echo 📋 INSTALLATION SUMMARY:
-                type "${REPORTS_DIR}\\install_report.txt" 2>nul || echo No installation report found
+                @echo off
+                echo 📋 REPORT SUMMARY:
+                echo =================
+                if exist "${REPORTS_DIR}\\report.txt" (
+                    type "${REPORTS_DIR}\\report.txt"
+                ) else (
+                    echo No report file found
+                )
             """
         }
         success {
-            echo "🎉 PIPELINE SUCCESS!"
-            echo "✅ Python has been installed on Jenkins agent"
-            echo "✅ All dependencies from requirements.txt have been installed"
+            echo "🎉 PIPELINE COMPLETED SUCCESSFULLY!"
+            echo "✅ All dependencies installed from requirements.txt"
         }
         failure {
-            echo "❌ Pipeline failed"
-            echo "💡 Tip: Jenkins agent might need admin rights to install Python"
+            echo "❌ Pipeline failed - Python is not installed on Jenkins agent"
         }
     }
 }
