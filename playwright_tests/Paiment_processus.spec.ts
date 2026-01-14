@@ -4,11 +4,10 @@ let context: BrowserContext;
 let page: Page;
 
 test.beforeAll(async ({ browser }) => {
-  // 1️⃣ Hook beforeAll : connexion utilisateur standard
   context = await browser.newContext();
   page = await context.newPage();
 
-  await page.goto('https://www.saucedemo.com/');
+  await page.goto('/');
 
   await page.fill('#user-name', 'standard_user');
   await page.fill('#password', 'secret_sauce');
@@ -23,38 +22,37 @@ test.afterAll(async () => {
 
 test('Processus de paiement complet', async () => {
 
-  // 2️⃣ Ajouter un produit au panier
-  await page.click('[data-test="add-to-cart-sauce-labs-backpack"]');
+  // Ajouter un produit
+  await page.locator('[data-test="add-to-cart-sauce-labs-backpack"]').click();
 
-  // 3️⃣ Aller dans le panier
-  await page.click('.shopping_cart_link');
+  // Aller au panier
+  await page.locator('.shopping_cart_link').click();
   await expect(page.locator('.cart_item')).toHaveCount(1);
 
-  // 4️⃣ Cliquer sur "Checkout"
-  await page.click('[data-test="checkout"]');
+  // Checkout
+  await page.locator('[data-test="checkout"]').click();
 
-  // 5️⃣ Remplir le formulaire
+  // Formulaire
   await page.fill('[data-test="firstName"]', 'Test');
   await page.fill('[data-test="lastName"]', 'User');
   await page.fill('[data-test="postalCode"]', '12345');
 
-  // 6️⃣ Cliquer sur "Continue"
-  await page.click('[data-test="continue"]');
+  await page.locator('[data-test="continue"]').click();
 
-  // 7️⃣ Vérifier la page de récapitulatif
+  // Vérification récapitulatif
   await expect(page).toHaveURL(/checkout-step-two.html/);
   await expect(page.locator('.summary_info')).toBeVisible();
   await expect(page.locator('.inventory_item_name'))
-    .toHaveText('Sauce Labs Backpack');
+    .toHaveText(/Sauce Labs Backpack/);
 
-  // 8️⃣ Cliquer sur "Finish"
-  await page.click('[data-test="finish"]');
+  // Finish
+  await page.locator('[data-test="finish"]').click();
 
-  // 9️⃣ Vérifier le message de confirmation
+  // Confirmation
   await expect(page.locator('.complete-header'))
     .toHaveText('Thank you for your order!');
 
-  // 🔟 Vérifier que le badge du panier n'est plus visible
+  // Panier vide
   await expect(page.locator('.shopping_cart_badge'))
     .toHaveCount(0);
 });
