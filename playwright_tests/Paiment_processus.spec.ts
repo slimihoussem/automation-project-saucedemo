@@ -1,60 +1,133 @@
-import { test, expect, BrowserContext, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import * as pageFunctions from './page-functions';
 
-let context: BrowserContext;
-let page: Page;
+// Simple performance tracking
+const performanceStats: Array<{
+  test: string;
+  duration: number;
+  status: 'PASS' | 'FAIL';
+  timestamp: string;
+}> = [];
 
-test.beforeAll(async ({ browser }) => {
-  // 1️⃣ Hook beforeAll : connexion utilisateur standard
-  context = await browser.newContext();
-  page = await context.newPage();
+test.describe('Checkout Process with Stats', () => {
+  test.beforeEach(async ({ page }) => {
+    console.time('setup');
+    await pageFunctions.goto(page);
+    await pageFunctions.login(page);
+    await expect(page).toHaveURL(/inventory.html/);
+    console.timeEnd('setup');
+  });
 
-  await page.goto('https://www.saucedemo.com/');
-
-  await page.fill('#user-name', 'standard_user');
-  await page.fill('#password', 'secret_sauce');
-  await page.click('#login-button');
-
-  await expect(page).toHaveURL(/inventory.html/);
-});
-
-test.afterAll(async () => {
-  await context.close();
-});
-
-test('Processus de paiement complet', async () => {
-
-  // 2️⃣ Ajouter un produit au panier
-  await page.click('[data-test="add-to-cart-sauce-labs-backpack"]');
-
-  // 3️⃣ Aller dans le panier
-  await page.click('.shopping_cart_link');
-  await expect(page.locator('.cart_item')).toHaveCount(1);
-
-  // 4️⃣ Cliquer sur "Checkout"
-  await page.click('[data-test="checkout"]');
-
-  // 5️⃣ Remplir le formulaire
-  await page.fill('[data-test="firstName"]', 'Test');
-  await page.fill('[data-test="lastName"]', 'User');
-  await page.fill('[data-test="postalCode"]', '12345');
-
-  // 6️⃣ Cliquer sur "Continue"
-  await page.click('[data-test="continue"]');
-
-  // 7️⃣ Vérifier la page de récapitulatif
-  await expect(page).toHaveURL(/checkout-step-two.html/);
-  await expect(page.locator('.summary_info')).toBeVisible();
-  await expect(page.locator('.inventory_item_name'))
-    .toHaveText('Sauce Labs Backpack');
-
-  // 8️⃣ Cliquer sur "Finish"
-  await page.click('[data-test="finish"]');
-
-  // 9️⃣ Vérifier le message de confirmation
-  await expect(page.locator('.complete-header'))
-    .toHaveText('Thank you for your order!');
-
-  // 🔟 Vérifier que le badge du panier n'est plus visible
-  await expect(page.locator('.shopping_cart_badge'))
-    .toHaveCount(0);
+  test('Complete checkout with one item', async ({ page }) => {
+    const testStart = Date.now();
+    
+    try {
+      console.time('add-to-cart');
+      await pageFunctions.addToCart(page, 'sauce-labs-backpack');
+      console.timeEnd('add-to-cart');
+      
+      console.time('go-to-cart');
+      await pageFunctions.goToCart(page);
+      console.timeEnd('go-to-cart');
+      
+      await pageFunctions.checkCartHasItems(page, 1);
+      
+      console.time('checkout-process');
+      await pageFunctions.startCheckout(page);
+      await pageFunctions.fillShippingInfo(page, 'Test', 'User', '12345');
+      await pageFunctions.continueCheckout(page);
+      console.timeEnd('checkout-process');
+      
+      await expect(page).toHaveURL(/checkout-step-two.html/);
+      
+      console.time('complete-purchase');
+      await pageFunctions.finishCheckout(page);
+      console.timeEnd('complete-purchase');
+      
+      await pageFunctions.checkOrderConfirmation(page);
+      await pageFunctions.checkCartIsEmpty(page);
+      
+      const testDuration = Date.now() - testStart;
+      performanceStats.push({
+        test: 'Complete checkout with one item',
+        duration: testDuration,
+        status: 'PASS',
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`✅ Test completed in ${testDuration}ms`);
+      
+    } catch (error) {
+      const testDuration = Date.now() - testStart;
+      performanceStats.push({
+        test: 'Complete checkout with one item',
+        duration: testDuration,
+        status: 'FAIL',
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  });
+  
+  test('Checkout with multiple items', async ({ page }) => {
+    const testStart = Date.now();
+    
+    try {
+      await pageFunctions.addToCart(page, 'sauce-labs-backpack');
+      await pageFunctions.addToCart(page, 'sauce-labs-bike-light');
+      
+      await pageFunctions.goToCart(page);
+      await pageFunctions.checkCartHasItems(page, 2);
+      
+      await pageFunctions.startCheckout(page);
+      await pageFunctions.fillShippingInfo(page, 'Test', 'User', '12345');
+      await pageFunctions.continueCheckout(page);
+      await pageFunctions.finishCheckout(page);
+      await pageFunctions.checkOrderConfirmation(page);
+      
+      const testDuration = Date.now() - testStart;
+      performanceStats.push({
+        test: 'Checkout with multiple items',
+        duration: testDuration,
+        status: 'PASS',
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log(`✅ Test completed in ${testDuration}ms`);
+      
+    } catch (error) {
+      const testDuration = Date.now() - testStart;
+      performanceStats.push({
+        test: 'Checkout with multiple items',
+        duration: testDuration,
+        status: 'FAIL',
+        timestamp: new Date().toISOString()
+      });
+      throw error;
+    }
+  });
+  
+  test.afterAll(() => {
+    // Print summary statistics
+    console.log('\n📊 Test Statistics Summary:');
+    console.log('==========================');
+    
+    const totalTests = performanceStats.length;
+    const passedTests = performanceStats.filter(s => s.status === 'PASS').length;
+    const failedTests = performanceStats.filter(s => s.status === 'FAIL').length;
+    const totalDuration = performanceStats.reduce((sum, stat) => sum + stat.duration, 0);
+    const avgDuration = totalDuration / totalTests;
+    
+    console.log(`Total Tests: ${totalTests}`);
+    console.log(`Passed: ${passedTests}`);
+    console.log(`Failed: ${failedTests}`);
+    console.log(`Success Rate: ${((passedTests / totalTests) * 100).toFixed(1)}%`);
+    console.log(`Total Execution Time: ${totalDuration}ms`);
+    console.log(`Average Test Duration: ${avgDuration.toFixed(0)}ms`);
+    
+    console.log('\nIndividual Test Results:');
+    performanceStats.forEach(stat => {
+      console.log(`${stat.status === 'PASS' ? '✅' : '❌'} ${stat.test}: ${stat.duration}ms`);
+    });
+  });
 });
