@@ -1,4 +1,6 @@
 selenium==4.39.0
 robotframework==6.1.1
 robotframework-seleniumlibrary==6.8.0
-
+pytest==7.4.3
+pytest-html==4.1.1
+webdriver-manager==4.0.1
