@@ -6,14 +6,14 @@ pipeline {
     }
 
     environment {
-        PLAYWRIGHT_REPORT_DIR = 'reports\\playwright'
-        SELENIUM_REPORT_DIR  = 'reports\\selenium'
-        ROBOT_REPORT_DIR     = 'reports\\robot'
+        PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
+        SELENIUM_REPORT_DIR  = 'reports/selenium'
+        ROBOT_REPORT_DIR     = 'reports/robot'
     }
 
     stages {
 
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
@@ -23,24 +23,22 @@ pipeline {
             steps {
                 echo 'Preparing reports directories...'
                 bat 'if not exist reports mkdir reports'
-                bat 'if not exist %PLAYWRIGHT_REPORT_DIR% mkdir %PLAYWRIGHT_REPORT_DIR%'
-                bat 'if not exist %SELENIUM_REPORT_DIR% mkdir %SELENIUM_REPORT_DIR%'
-                bat 'if not exist %ROBOT_REPORT_DIR% mkdir %ROBOT_REPORT_DIR%'
+                bat 'if not exist reports\\playwright mkdir reports\\playwright'
+                bat 'if not exist reports\\selenium mkdir reports\\selenium'
+                bat 'if not exist reports\\robot mkdir reports\\robot'
             }
         }
 
-        stage('Install Node & Python Dependencies') {
+        stage('Install Dependencies') {
             parallel {
                 stage('Node & Playwright') {
                     steps {
-                        echo 'Installing Node.js dependencies and Playwright browsers...'
                         bat 'npm install'
                         bat 'npx playwright install'
                     }
                 }
                 stage('Python Dependencies') {
                     steps {
-                        echo 'Installing Python dependencies...'
                         bat 'py -m pip install --upgrade pip'
                         bat 'py -m pip install -r requirements.txt'
                     }
@@ -54,18 +52,11 @@ pipeline {
                 stage('Playwright - Checkout') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Playwright Checkout Tests...'
                             bat """
                             npx playwright test playwright_tests/paiement_process.spec.ts ^
-                            --reporter=list,junit ^
-                            --output=%PLAYWRIGHT_REPORT_DIR%\\checkout
+                            --reporter=junit ^
+                            --output=${PLAYWRIGHT_REPORT_DIR}/checkout
                             """
-                        }
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "%PLAYWRIGHT_REPORT_DIR%\\checkout\\**", allowEmptyArchive: true
-                            junit allowEmptyResults: true, testResults: "%PLAYWRIGHT_REPORT_DIR%\\checkout\\junit.xml"
                         }
                     }
                 }
@@ -73,18 +64,11 @@ pipeline {
                 stage('Playwright - Product Filter') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Playwright Product Filter Tests...'
                             bat """
                             npx playwright test playwright_tests/product-filter.spec.ts ^
-                            --reporter=list,junit ^
-                            --output=%PLAYWRIGHT_REPORT_DIR%\\product-filter
+                            --reporter=junit ^
+                            --output=${PLAYWRIGHT_REPORT_DIR}/product-filter
                             """
-                        }
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "%PLAYWRIGHT_REPORT_DIR%\\product-filter\\**", allowEmptyArchive: true
-                            junit allowEmptyResults: true, testResults: "%PLAYWRIGHT_REPORT_DIR%\\product-filter\\junit.xml"
                         }
                     }
                 }
@@ -92,14 +76,7 @@ pipeline {
                 stage('Selenium Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Selenium Tests...'
-                            bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=%SELENIUM_REPORT_DIR%\\selenium-results.xml'
-                        }
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "%SELENIUM_REPORT_DIR%\\**", allowEmptyArchive: true
-                            junit allowEmptyResults: true, testResults: "%SELENIUM_REPORT_DIR%\\selenium-results.xml"
+                            bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports/selenium/selenium-results.xml'
                         }
                     }
                 }
@@ -107,35 +84,44 @@ pipeline {
                 stage('Robot Framework Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Robot Framework Tests...'
                             bat """
                             py -m robot ^
-                            --outputdir %ROBOT_REPORT_DIR%\\output ^
-                            --xunit %ROBOT_REPORT_DIR%\\output\\xunit.xml ^
-                            robot_tests/
+                            --outputdir ${ROBOT_REPORT_DIR}/output ^
+                            --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
+                            robot_tests
                             """
-                        }
-                    }
-                    post {
-                        always {
-                            archiveArtifacts artifacts: "%ROBOT_REPORT_DIR%\\**", allowEmptyArchive: true
-                            junit allowEmptyResults: true, testResults: "%ROBOT_REPORT_DIR%\\output\\xunit.xml"
                         }
                     }
                 }
             }
         }
 
-        stage('Final Summary') {
+        stage('Archive Artifacts & Publish Reports') {
             steps {
-                echo 'All test stages finished. Check reports directory for details.'
+                echo 'Archiving artifacts and publishing test results...'
+
+                // Playwright Checkout
+                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/checkout/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/checkout/**/junit.xml"
+
+                // Playwright Product Filter
+                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**/junit.xml"
+
+                // Selenium
+                archiveArtifacts artifacts: "${SELENIUM_REPORT_DIR}/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/selenium-results.xml"
+
+                // Robot Framework
+                archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished.'
+            echo 'Pipeline finished. Check reports/ directory for all artifacts and test results.'
         }
     }
 }
