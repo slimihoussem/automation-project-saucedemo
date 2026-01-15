@@ -22,13 +22,13 @@ pipeline {
             steps {
                 echo 'Running Playwright tests...'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'npx playwright test --reporter=html,junit --reporter=junit:reports\\playwright\\playwright-results.xml'
+                    bat 'npx playwright test'  // configured in playwright.config.ts
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: 'reports/playwright/playwright-results.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/playwright/results.xml'
                 }
             }
         }
@@ -44,7 +44,7 @@ pipeline {
             steps {
                 echo 'Running Selenium tests'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py run_tests.py'
+                    bat 'py selenium_tests\\run_tests.py'
                 }
             }
             post {
@@ -59,7 +59,7 @@ pipeline {
             steps {
                 echo 'Running Robot Framework tests'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m robot --outputdir reports\\robot --xunit reports\\robot\\xunit.xml robot_tests/'
+                    bat 'py -m robot --outputdir reports\\robot\\output --xunit reports\\robot\\xunit.xml robot_tests/'
                 }
             }
             post {
@@ -76,9 +76,9 @@ pipeline {
                 echo 'Playwright:'
                 bat 'dir reports\\playwright'
                 echo 'Selenium:'
-                bat 'type reports\\selenium\\selenium-results.xml || echo No selenium results'
+                bat 'dir reports\\selenium'
                 echo 'Robot:'
-                bat 'type reports\\robot\\xunit.xml || echo No robot results'
+                bat 'dir reports\\robot'
                 echo '=============================================='
             }
         }

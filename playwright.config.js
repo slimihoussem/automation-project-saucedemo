@@ -19,8 +19,9 @@ export default defineConfig({
 
   /* 📊 Reporters (Jenkins-friendly) */
   reporter: [
-    ['list'],
-    ['html', { outputFolder: 'reports', open: 'never' }],
+  ['list'],
+  ['html', { outputFolder: 'reports/playwright/html', open: 'never' }],
+  ['junit', { outputFile: 'reports/playwright/results.xml' }],
   ],
 
   /* ⚙️ Shared settings */
