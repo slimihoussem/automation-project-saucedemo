@@ -13,6 +13,16 @@ pipeline {
             }
         }
 
+        stage('Prepare Reports Directory') {
+            steps {
+                echo 'Preparing reports directories...'
+                bat 'mkdir reports || echo reports exists'
+                bat 'mkdir reports/playwright || echo reports/playwright exists'
+                bat 'mkdir reports/selenium || echo reports/selenium exists'
+                bat 'mkdir reports/robot || echo reports/robot exists'
+            }
+        }
+
         stage('Install Node.js Dependencies') {
             steps {
                 echo 'Installing Node.js dependencies...'
@@ -31,15 +41,9 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Playwright tests...'
-                    // Reports go to reports/playwright
                     bat 'npx playwright test --reporter=html,junit --output=reports/playwright'
-                }
-            }
-            post {
-                always {
                     echo 'Archiving Playwright artifacts...'
                     archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
-                    echo 'Publishing Playwright JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/playwright/**/*.xml'
                 }
             }
@@ -53,19 +57,13 @@ pipeline {
             }
         }
 
-        stage('Run Selenium Tests') {
+        stage('Run Selenium Test') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Selenium test: TestConnexionError.py'
-                    // Explicit test file and output XML
                     bat 'py -m pytest selenium_tests/TestConnexionError.py --junitxml=reports/selenium/results.xml'
-                }
-            }
-            post {
-                always {
                     echo 'Archiving Selenium artifacts...'
                     archiveArtifacts artifacts: 'reports/selenium/**', allowEmptyArchive: true
-                    echo 'Publishing Selenium JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/selenium/results.xml'
                 }
             }
@@ -75,17 +73,40 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Robot Framework tests...'
-                    // Output goes to reports/robot
                     bat 'py -m robot --outputdir reports/robot robot_tests/'
-                }
-            }
-            post {
-                always {
                     echo 'Archiving Robot Framework artifacts...'
                     archiveArtifacts artifacts: 'reports/robot/**', allowEmptyArchive: true
-                    echo 'Publishing Robot Framework JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/robot/output.xml'
                 }
+            }
+        }
+
+        stage('Print Test Summary') {
+            steps {
+                echo '====== TEST SUMMARY ======'
+                // Using Python to parse all XMLs and summarize pass/fail counts
+                bat '''py - <<END
+import xml.etree.ElementTree as ET
+import glob
+
+def summarize_junit(path_pattern, name):
+    files = glob.glob(path_pattern, recursive=True)
+    total = passed = failed = 0
+    for f in files:
+        tree = ET.parse(f)
+        root = tree.getroot()
+        for testcase in root.iter('testcase'):
+            total += 1
+            if testcase.find('failure') is not None:
+                failed += 1
+            else:
+                passed += 1
+    print(f"{name}: Total={total}, Passed={passed}, Failed={failed}")
+
+summarize_junit("reports/playwright/**/*.xml", "Playwright")
+summarize_junit("reports/selenium/*.xml", "Selenium")
+summarize_junit("reports/robot/output.xml", "Robot Framework")
+END'''
             }
         }
     }
@@ -93,12 +114,6 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished. All reports are in reports/ directory.'
-        }
-        success {
-            echo '✅ All stages completed successfully (tests may still have failed individually).'
-        }
-        failure {
-            echo '❌ One or more tests failed.'
         }
     }
 }
