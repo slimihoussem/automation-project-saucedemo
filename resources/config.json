@@ -1,0 +1,30 @@
+{
+  "URL": "https://www.saucedemo.com/",
+  "BROWSER": "chrome",
+  "USER": "standard_user",
+  "PASS": "secret_sauce",
+  "locators": {
+    "login_user": "id=user-name",
+    "login_pass": "id=password",
+    "login_btn": "id=login-button",
+    "menu_btn": "id=react-burger-menu-btn",
+    "menu_container": "class=bm-menu-wrap",
+    "item_link": "id=inventory_sidebar_link",
+    "about_link": "id=about_sidebar_link",
+    "reset_link": "id=reset_sidebar_link",
+    "logout_link": "id=logout_sidebar_link",
+    "cart_badge": "class=shopping_cart_badge",
+    "add_to_cart_btn": "id=add-to-cart-sauce-labs-backpack",
+    "inventory_item": "class=inventory_item",
+    "item_img": "css=.inventory_item_img img",
+    "item_add_btn": "css=button[id^='add-to-cart']",
+    "item_name_link": "class=inventory_item_name",
+    "back_to_products": "id=back-to-products"
+  },
+  "menu_labels": [
+    "All Items",
+    "About",
+    "Logout",
+    "Reset App State"
+  ]
+}

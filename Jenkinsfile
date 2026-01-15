@@ -48,7 +48,7 @@ pipeline {
         }
 
         /* =========================
-           SELENIUM (SCRIPT MODE)
+           SELENIUM
         ========================== */
         stage('Install Python Dependencies') {
             steps {
@@ -60,7 +60,7 @@ pipeline {
             }
         }
 
-        stage('Run Selenium Tests (Script Mode)') {
+        stage('Run Selenium Tests') {
             steps {
                 echo 'Running Selenium tests (Python script)...'
                 bat '''
@@ -69,11 +69,30 @@ pipeline {
                 '''
             }
         }
+
+        /* =========================
+           ROBOT FRAMEWORK
+        ========================== */
+        stage('Run Robot Framework Tests') {
+            steps {
+                echo 'Running Robot Framework tests...'
+                bat '''
+                    cd robot_tests
+                    %PYTHON_CMD% -m robot --outputdir ../test-results/robot_results .
+                '''
+            }
+            post {
+                always {
+                    // Archive Robot Framework results
+                    archiveArtifacts artifacts: 'test-results/robot_results/**', allowEmptyArchive: true
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo '✅ Playwright + Selenium tests passed'
+            echo '✅ All tests (Playwright + Selenium + Robot) passed'
         }
         failure {
             echo '❌ One or more test stages failed'
