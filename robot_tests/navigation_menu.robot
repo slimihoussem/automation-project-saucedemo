@@ -38,12 +38,18 @@ Validate Burger Menu Functionality
     Reload Page
     Wait Until Element Is Visible    ${locators['menu_btn']}    timeout=10s
 
-    # 7.5 ADDED STEP: Add a product to ensure Reset has something to clear
+  # ... (Previous steps: Login, Add to Cart)
+
+    # 7.5 Add a product
     Add Item To Cart
     
-    # 8 & 9. Reset App State (Now validates the badge disappears)
+    # 8 & 9. Reset App State 
+    # This keyword will now fail because SauceDemo doesn't 
+    # update the button text without a page refresh.
     Reset App State And Verify Cart
+    
+# ... (Logout)
     
     # 10 & 11. Logout and Verify Login Page
     Logout From App
-    Location Should Be    ${URL}
+    Location Should Be    ${URL}    

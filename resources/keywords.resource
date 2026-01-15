@@ -40,18 +40,23 @@ Add Item To Cart
     Wait Until Element Is Visible    ${locators['cart_badge']}         timeout=5s
     Element Text Should Be           ${locators['cart_badge']}         1
 
+*** Keywords ***
 Reset App State And Verify Cart
-    [Documentation]    Resets the state and ensures the cart badge is removed.
+    [Documentation]    Resets state and verifies if the UI actually updates the buttons.
     Open Sidebar Menu
     Wait Until Element Is Visible    ${locators['reset_link']}
     Click Element     ${locators['reset_link']}
     
-    # Close the menu to check the cart badge on the main page
+    # Close the menu so we can see the product buttons
     Execute Javascript    document.getElementById('react-burger-cross-btn').click()
+    Sleep    1s    # Small buffer for the UI to attempt an update
     
-    # Verify the cart is now empty (badge should disappear)
-    Wait Until Element Is Not Visible    ${locators['cart_badge']}     timeout=5s
-    Element Should Not Be Visible        ${locators['cart_badge']}
+    # 1. Verify Cart Badge is gone (This usually passes)
+    Page Should Not Contain Element      ${locators['cart_badge']}
+    
+    # 2. Verify Button Text has reverted (This is where the test will FAIL)
+    # We expect the text to be 'Add to cart'
+    Element Text Should Be    ${locators['add_to_cart_btn']}    Add to cart
 
 Logout From App
     Open Sidebar Menu
