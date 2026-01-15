@@ -16,10 +16,11 @@ pipeline {
         stage('Prepare Reports Directory') {
             steps {
                 echo 'Preparing reports directories...'
-                bat 'mkdir reports || echo reports exists'
-                bat 'mkdir reports/playwright || echo reports/playwright exists'
-                bat 'mkdir reports/selenium || echo reports/selenium exists'
-                bat 'mkdir reports/robot || echo reports/robot exists'
+                // Windows-safe mkdir commands
+                bat 'if not exist reports mkdir reports'
+                bat 'if not exist reports\\playwright mkdir reports\\playwright'
+                bat 'if not exist reports\\selenium mkdir reports\\selenium'
+                bat 'if not exist reports\\robot mkdir reports\\robot'
             }
         }
 
@@ -39,11 +40,16 @@ pipeline {
 
         stage('Run Playwright Tests') {
             steps {
+                echo 'Running Playwright tests...'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    echo 'Running Playwright tests...'
-                    bat 'npx playwright test --reporter=html,junit --output=reports/playwright'
+                    bat 'npx playwright test --reporter=html,junit --output=reports\\playwright'
+                }
+            }
+            post {
+                always {
                     echo 'Archiving Playwright artifacts...'
                     archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
+                    echo 'Publishing Playwright JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/playwright/**/*.xml'
                 }
             }
@@ -59,23 +65,33 @@ pipeline {
 
         stage('Run Selenium Test') {
             steps {
+                echo 'Running Selenium test: TestConnexionError.py'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    echo 'Running Selenium test: TestConnexionError.py'
-                    bat 'py -m pytest selenium_tests/TestConnexionError.py --junitxml=reports/selenium/results.xml'
+                    bat 'py -m pytest selenium_tests/TestConnexionError.py --junitxml=reports\\selenium\\results.xml'
+                }
+            }
+            post {
+                always {
                     echo 'Archiving Selenium artifacts...'
                     archiveArtifacts artifacts: 'reports/selenium/**', allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: 'reports/selenium/results.xml'
+                    echo 'Publishing Selenium JUnit results...'
+                    junit allowEmptyResults: true, testResults: 'reports/selenium/**/*.xml'
                 }
             }
         }
 
         stage('Run Robot Framework Tests') {
             steps {
+                echo 'Running Robot Framework tests...'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    echo 'Running Robot Framework tests...'
-                    bat 'py -m robot --outputdir reports/robot robot_tests/'
+                    bat 'py -m robot --outputdir reports\\robot robot_tests/'
+                }
+            }
+            post {
+                always {
                     echo 'Archiving Robot Framework artifacts...'
                     archiveArtifacts artifacts: 'reports/robot/**', allowEmptyArchive: true
+                    echo 'Publishing Robot JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/robot/output.xml'
                 }
             }
@@ -83,30 +99,14 @@ pipeline {
 
         stage('Print Test Summary') {
             steps {
-                echo '====== TEST SUMMARY ======'
-                // Using Python to parse all XMLs and summarize pass/fail counts
-                bat '''py - <<END
-import xml.etree.ElementTree as ET
-import glob
-
-def summarize_junit(path_pattern, name):
-    files = glob.glob(path_pattern, recursive=True)
-    total = passed = failed = 0
-    for f in files:
-        tree = ET.parse(f)
-        root = tree.getroot()
-        for testcase in root.iter('testcase'):
-            total += 1
-            if testcase.find('failure') is not None:
-                failed += 1
-            else:
-                passed += 1
-    print(f"{name}: Total={total}, Passed={passed}, Failed={failed}")
-
-summarize_junit("reports/playwright/**/*.xml", "Playwright")
-summarize_junit("reports/selenium/*.xml", "Selenium")
-summarize_junit("reports/robot/output.xml", "Robot Framework")
-END'''
+                echo '================ TEST SUMMARY ================'
+                echo 'Playwright test results:'
+                bat 'type reports\\playwright\\*.txt || echo No playwright summary file'
+                echo 'Selenium test results:'
+                bat 'type reports\\selenium\\results.xml || echo No selenium results'
+                echo 'Robot Framework test results:'
+                bat 'type reports\\robot\\output.xml || echo No robot results'
+                echo '=============================================='
             }
         }
     }
@@ -114,6 +114,7 @@ END'''
     post {
         always {
             echo 'Pipeline finished. All reports are in reports/ directory.'
+            echo '✅ All stages completed (tests may still have failed individually).'
         }
     }
 }
