@@ -6,14 +6,14 @@ pipeline {
     }
 
     environment {
-        PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
-        SELENIUM_REPORT_DIR  = 'reports/selenium'
-        ROBOT_REPORT_DIR     = 'reports/robot'
+        PLAYWRIGHT_REPORT_DIR = 'reports\\playwright'
+        SELENIUM_REPORT_DIR  = 'reports\\selenium'
+        ROBOT_REPORT_DIR     = 'reports\\robot'
     }
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
                 checkout scm
             }
@@ -29,114 +29,113 @@ pipeline {
             }
         }
 
-        stage('Install Node.js Dependencies') {
-            steps {
-                echo 'Installing Node.js dependencies...'
-                bat 'npm install'
-            }
-        }
-
-        stage('Install Playwright Browsers') {
-            steps {
-                echo 'Installing Playwright browsers...'
-                bat 'npx playwright install'
-            }
-        }
-
-        stage('Run Playwright Tests') {
-            steps {
-                echo 'Running Playwright tests...'
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat """
-                    npx playwright test ^
-                    --reporter=list,junit ^
-                    --output=%PLAYWRIGHT_REPORT_DIR%
-                    """
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/junit.xml"
-                }
-            }
-        }
-
-        stage('Install Python Dependencies') {
-            steps {
-                echo 'Installing Python dependencies...'
-                bat 'py -m pip install --upgrade pip'
-                bat 'py -m pip install -r requirements.txt'
-            }
-        }
-
-        stage('Run Selenium Tests') {
-            steps {
-                echo 'Running Selenium tests...'
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports/selenium/selenium-results.xml'
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: "${SELENIUM_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/selenium-results.xml"
-                }
-            }
-        }
-
-        stage('Run Robot Framework Tests') {
-            steps {
-                echo 'Running Robot Framework tests...'
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat """
-                    py -m robot ^
-                    --outputdir ${ROBOT_REPORT_DIR}/output ^
-                    --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
-                    robot_tests/
-                    """
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
-                }
-            }
-        }
-
-        stage('Final Test Summary') {
-            steps {
-                script {
-                    def summary = [:]
-
-                    // Function to parse JUnit XML and return test results map
-                    def parseJUnitXml = { path ->
-                        def results = []
-                        if (fileExists(path)) {
-                            def xml = readFile(path)
-                            def matcher = xml =~ /<testcase name="([^"]+)" classname="[^"]+"[^>]*>(?:(<failure|<error).*?)?<\/testcase>/
-                            matcher.each { m ->
-                                def name = m[1]
-                                def status = (m[2]) ? 'FAIL' : 'PASS'
-                                results << [name, status]
-                            }
-                        }
-                        return results
+        stage('Install Node & Python Dependencies') {
+            parallel {
+                stage('Node & Playwright') {
+                    steps {
+                        echo 'Installing Node.js dependencies and Playwright browsers...'
+                        bat 'npm install'
+                        bat 'npx playwright install'
                     }
-
-                    summary['Playwright'] = parseJUnitXml("${PLAYWRIGHT_REPORT_DIR}/junit.xml")
-                    summary['Selenium'] = parseJUnitXml("${SELENIUM_REPORT_DIR}/selenium-results.xml")
-                    summary['Robot Framework'] = parseJUnitXml("${ROBOT_REPORT_DIR}/output/xunit.xml")
-
                 }
+                stage('Python Dependencies') {
+                    steps {
+                        echo 'Installing Python dependencies...'
+                        bat 'py -m pip install --upgrade pip'
+                        bat 'py -m pip install -r requirements.txt'
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            parallel {
+
+                stage('Playwright - Checkout') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            echo 'Running Playwright Checkout Tests...'
+                            bat """
+                            npx playwright test playwright_tests/paiement_process.spec.ts ^
+                            --reporter=list,junit ^
+                            --output=%PLAYWRIGHT_REPORT_DIR%\\checkout
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: "%PLAYWRIGHT_REPORT_DIR%\\checkout\\**", allowEmptyArchive: true
+                            junit allowEmptyResults: true, testResults: "%PLAYWRIGHT_REPORT_DIR%\\checkout\\junit.xml"
+                        }
+                    }
+                }
+
+                stage('Playwright - Product Filter') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            echo 'Running Playwright Product Filter Tests...'
+                            bat """
+                            npx playwright test playwright_tests/product-filter.spec.ts ^
+                            --reporter=list,junit ^
+                            --output=%PLAYWRIGHT_REPORT_DIR%\\product-filter
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: "%PLAYWRIGHT_REPORT_DIR%\\product-filter\\**", allowEmptyArchive: true
+                            junit allowEmptyResults: true, testResults: "%PLAYWRIGHT_REPORT_DIR%\\product-filter\\junit.xml"
+                        }
+                    }
+                }
+
+                stage('Selenium Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            echo 'Running Selenium Tests...'
+                            bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=%SELENIUM_REPORT_DIR%\\selenium-results.xml'
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: "%SELENIUM_REPORT_DIR%\\**", allowEmptyArchive: true
+                            junit allowEmptyResults: true, testResults: "%SELENIUM_REPORT_DIR%\\selenium-results.xml"
+                        }
+                    }
+                }
+
+                stage('Robot Framework Tests') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            echo 'Running Robot Framework Tests...'
+                            bat """
+                            py -m robot ^
+                            --outputdir %ROBOT_REPORT_DIR%\\output ^
+                            --xunit %ROBOT_REPORT_DIR%\\output\\xunit.xml ^
+                            robot_tests/
+                            """
+                        }
+                    }
+                    post {
+                        always {
+                            archiveArtifacts artifacts: "%ROBOT_REPORT_DIR%\\**", allowEmptyArchive: true
+                            junit allowEmptyResults: true, testResults: "%ROBOT_REPORT_DIR%\\output\\xunit.xml"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Final Summary') {
+            steps {
+                echo 'All test stages finished. Check reports directory for details.'
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished. Check reports/ directory for details.'
+            echo 'Pipeline finished.'
         }
     }
 }
