@@ -1,10 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        VENV_DIR = "${WORKSPACE}\\venv"
-    }
-
     options {
         timestamps()
     }
@@ -17,20 +13,6 @@ pipeline {
             }
         }
 
-        stage('Setup Python Environment') {
-            steps {
-                echo 'Creating Python virtual environment...'
-                bat 'py -m venv %VENV_DIR%'
-
-                echo 'Installing Python dependencies...'
-                bat """
-                    call %VENV_DIR%\\Scripts\\activate
-                    python -m pip install --upgrade pip
-                    pip install -r requirements.txt
-                """
-            }
-        }
-
         stage('Install Node.js Dependencies') {
             steps {
                 echo 'Installing Node.js dependencies...'
@@ -38,37 +20,22 @@ pipeline {
             }
         }
 
-        stage('Run Selenium & Robot Tests') {
+        stage('Install Playwright Browsers') {
             steps {
-                echo 'Running Selenium (pytest) tests...'
-                bat """
-                    call %VENV_DIR%\\Scripts\\activate
-                    pytest selenium_tests --junitxml=test-results\\selenium-results.xml
-                """
-
-                echo 'Running Robot Framework tests...'
-                bat """
-                    call %VENV_DIR%\\Scripts\\activate
-                    robot --outputdir test-results robot_tests
-                """
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'test-results/*.xml'
-                    archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
-                }
+                echo 'Installing Playwright browsers...'
+                bat 'npx playwright install'
             }
         }
 
         stage('Run Playwright Tests') {
             steps {
                 echo 'Running Playwright tests...'
-                bat 'npx playwright install'
                 bat 'npx playwright test --reporter=html'
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'playwright_tests\\test-results/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
                 }
             }
         }
@@ -76,10 +43,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ All tests passed'
+            echo '✅ Playwright tests passed'
         }
         failure {
-            echo '❌ Some tests failed'
+            echo '❌ Playwright tests failed'
         }
         always {
             echo 'Pipeline finished'
