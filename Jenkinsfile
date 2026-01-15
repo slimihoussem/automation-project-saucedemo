@@ -1,16 +1,9 @@
 pipeline {
     agent any
-    options {
-        timestamps()
-    }
+    options { timestamps() }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+        stage('Checkout') { steps { checkout scm } }
 
         stage('Prepare Reports Directory') {
             steps {
@@ -22,74 +15,56 @@ pipeline {
             }
         }
 
-        stage('Install Node.js Dependencies') {
-            steps {
-                echo 'Installing Node.js dependencies...'
-                bat 'npm install'
-            }
-        }
-
-        stage('Install Playwright Browsers') {
-            steps {
-                echo 'Installing Playwright browsers...'
-                bat 'npx playwright install'
-            }
-        }
+        stage('Install Node.js Dependencies') { steps { bat 'npm install' } }
+        stage('Install Playwright Browsers') { steps { bat 'npx playwright install' } }
 
         stage('Run Playwright Tests') {
             steps {
                 echo 'Running Playwright tests...'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'npx playwright test --reporter=html,junit --output=reports\\playwright'
+                    bat 'npx playwright test --reporter=html,junit --reporter=junit:reports\\playwright\\playwright-results.xml'
                 }
             }
             post {
                 always {
-                    echo 'Archiving Playwright artifacts...'
                     archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
-                    echo 'Publishing Playwright JUnit results...'
-                    junit allowEmptyResults: true, testResults: 'reports/playwright/*.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/playwright/playwright-results.xml'
                 }
             }
         }
 
         stage('Install Python Dependencies') {
             steps {
-                echo 'Installing Python dependencies...'
                 bat 'py -m pip install --upgrade pip'
                 bat 'py -m pip install -r requirements.txt'
             }
         }
 
-        stage('Run Selenium Test') {
+        stage('Run Selenium Tests') {
             steps {
-                echo 'Running Selenium test: test_TestConnexionError.py'
+                echo 'Running Selenium tests'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports\\selenium\\results.xml'
+                    bat 'py run_tests.py'
                 }
             }
             post {
                 always {
-                    echo 'Archiving Selenium artifacts...'
                     archiveArtifacts artifacts: 'reports/selenium/**', allowEmptyArchive: true
-                    echo 'Publishing Selenium JUnit results...'
-                    junit allowEmptyResults: true, testResults: 'reports/selenium/results.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/selenium/selenium-results.xml'
                 }
             }
         }
 
         stage('Run Robot Framework Tests') {
             steps {
-                echo 'Running Robot Framework tests...'
+                echo 'Running Robot Framework tests'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     bat 'py -m robot --outputdir reports\\robot --xunit reports\\robot\\xunit.xml robot_tests/'
                 }
             }
             post {
                 always {
-                    echo 'Archiving Robot Framework artifacts...'
                     archiveArtifacts artifacts: 'reports/robot/**', allowEmptyArchive: true
-                    echo 'Publishing Robot JUnit results...'
                     junit allowEmptyResults: true, testResults: 'reports/robot/xunit.xml'
                 }
             }
@@ -98,11 +73,11 @@ pipeline {
         stage('Print Test Summary') {
             steps {
                 echo '================ TEST SUMMARY ================'
-                echo 'Playwright test results:'
+                echo 'Playwright:'
                 bat 'dir reports\\playwright'
-                echo 'Selenium test results:'
-                bat 'type reports\\selenium\\results.xml || echo No selenium results'
-                echo 'Robot Framework test results:'
+                echo 'Selenium:'
+                bat 'type reports\\selenium\\selenium-results.xml || echo No selenium results'
+                echo 'Robot:'
                 bat 'type reports\\robot\\xunit.xml || echo No robot results'
                 echo '=============================================='
             }
@@ -112,7 +87,6 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished. All reports are in reports/ directory.'
-            echo '✅ All stages completed (tests may still have failed individually).'
         }
     }
 }
