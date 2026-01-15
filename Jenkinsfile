@@ -1,6 +1,5 @@
 pipeline {
     agent any
-
     options {
         timestamps()
     }
@@ -16,7 +15,6 @@ pipeline {
         stage('Prepare Reports Directory') {
             steps {
                 echo 'Preparing reports directories...'
-                // Windows-safe mkdir commands
                 bat 'if not exist reports mkdir reports'
                 bat 'if not exist reports\\playwright mkdir reports\\playwright'
                 bat 'if not exist reports\\selenium mkdir reports\\selenium'
@@ -50,7 +48,7 @@ pipeline {
                     echo 'Archiving Playwright artifacts...'
                     archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
                     echo 'Publishing Playwright JUnit results...'
-                    junit allowEmptyResults: true, testResults: 'reports/playwright/**/*.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/playwright/*.xml'
                 }
             }
         }
@@ -65,9 +63,9 @@ pipeline {
 
         stage('Run Selenium Test') {
             steps {
-                echo 'Running Selenium test: TestConnexionError.py'
+                echo 'Running Selenium test: test_TestConnexionError.py'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m pytest selenium_tests/TestConnexionError.py --junitxml=reports\\selenium\\results.xml'
+                    bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports\\selenium\\results.xml'
                 }
             }
             post {
@@ -75,7 +73,7 @@ pipeline {
                     echo 'Archiving Selenium artifacts...'
                     archiveArtifacts artifacts: 'reports/selenium/**', allowEmptyArchive: true
                     echo 'Publishing Selenium JUnit results...'
-                    junit allowEmptyResults: true, testResults: 'reports/selenium/**/*.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/selenium/results.xml'
                 }
             }
         }
@@ -84,7 +82,7 @@ pipeline {
             steps {
                 echo 'Running Robot Framework tests...'
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m robot --outputdir reports\\robot robot_tests/'
+                    bat 'py -m robot --outputdir reports\\robot --xunit reports\\robot\\xunit.xml robot_tests/'
                 }
             }
             post {
@@ -92,7 +90,7 @@ pipeline {
                     echo 'Archiving Robot Framework artifacts...'
                     archiveArtifacts artifacts: 'reports/robot/**', allowEmptyArchive: true
                     echo 'Publishing Robot JUnit results...'
-                    junit allowEmptyResults: true, testResults: 'reports/robot/output.xml'
+                    junit allowEmptyResults: true, testResults: 'reports/robot/xunit.xml'
                 }
             }
         }
@@ -101,11 +99,11 @@ pipeline {
             steps {
                 echo '================ TEST SUMMARY ================'
                 echo 'Playwright test results:'
-                bat 'type reports\\playwright\\*.txt || echo No playwright summary file'
+                bat 'dir reports\\playwright'
                 echo 'Selenium test results:'
                 bat 'type reports\\selenium\\results.xml || echo No selenium results'
                 echo 'Robot Framework test results:'
-                bat 'type reports\\robot\\output.xml || echo No robot results'
+                bat 'type reports\\robot\\xunit.xml || echo No robot results'
                 echo '=============================================='
             }
         }
