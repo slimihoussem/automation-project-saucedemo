@@ -92,7 +92,7 @@ pipeline {
                     bat """
                     py -m robot ^
                     --outputdir ${ROBOT_REPORT_DIR}/output ^
-                    --xunit ${ROBOT_REPORT_DIR}/xunit.xml ^
+                    --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
                     robot_tests/
                     """
                 }
@@ -100,48 +100,43 @@ pipeline {
             post {
                 always {
                     archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/xunit.xml"
+                    junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
                 }
             }
         }
 
-        stage('Print Test Summary') {
+        stage('Final Test Summary') {
             steps {
-                echo '================== TEST SUMMARY =================='
                 script {
-
                     def summary = [:]
 
-                    // Function to parse junit XML manually (safe)
-                    def parseJUnitXml = { filePath ->
+                    // Function to parse JUnit XML and return test results map
+                    def parseJUnitXml = { path ->
                         def results = []
-                        if (fileExists(filePath)) {
-                            def text = readFile(filePath)
-                            def matcher = text =~ /<testcase name="([^"]+)" classname="[^"]+" time="[^"]+">(?:<system-out>.*?<\/system-out>)?(<failure|<error)?/
-                            matcher.each { match ->
-                                def name = match[1]
-                                def status = match[2] ? "FAIL" : "PASS"
-                                results.add([name: name, status: status])
+                        if (fileExists(path)) {
+                            def xml = readFile(path)
+                            def matcher = xml =~ /<testcase name="([^"]+)" classname="[^"]+"[^>]*>(?:(<failure|<error).*?)?<\/testcase>/
+                            matcher.each { m ->
+                                def name = m[1]
+                                def status = (m[2]) ? 'FAIL' : 'PASS'
+                                results << [name, status]
                             }
                         }
                         return results
                     }
 
-                    // Playwright summary
                     summary['Playwright'] = parseJUnitXml("${PLAYWRIGHT_REPORT_DIR}/junit.xml")
-                    // Selenium summary
                     summary['Selenium'] = parseJUnitXml("${SELENIUM_REPORT_DIR}/selenium-results.xml")
-                    // Robot summary
-                    summary['Robot Framework'] = parseJUnitXml("${ROBOT_REPORT_DIR}/xunit.xml")
+                    summary['Robot Framework'] = parseJUnitXml("${ROBOT_REPORT_DIR}/output/xunit.xml")
 
-                    // Print nicely
-                    summary.each { suite, tests ->
-                        echo "${suite}:"
+                    echo '================== TEST SUMMARY =================='
+                    summary.each { framework, tests ->
+                        echo "${framework}:"
                         if (tests.size() == 0) {
                             echo "  - No tests executed"
                         } else {
                             tests.each { t ->
-                                echo "  - ${t.name}: ${t.status}"
+                                echo "  - ${t[0]}: ${t[1]}"
                             }
                         }
                     }
@@ -151,12 +146,6 @@ pipeline {
     }
 
     post {
-        success {
-            echo '✅ All stages finished'
-        }
-        failure {
-            echo '❌ Pipeline finished with failures'
-        }
         always {
             echo 'Pipeline finished. Check reports/ directory for details.'
         }
