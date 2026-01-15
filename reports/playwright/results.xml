@@ -1,0 +1,8 @@
+<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="4.128955000000074">
+<testsuite name="product-filter.spec.ts" timestamp="2026-01-15T17:14:11.913Z" hostname="chromium" tests="2" failures="0" skipped="0" time="0.87" errors="0">
+<testcase name="Product sorting tests › Sort by price low to high" classname="product-filter.spec.ts" time="0.479">
+</testcase>
+<testcase name="Product sorting tests › Sort by price high to low" classname="product-filter.spec.ts" time="0.391">
+</testcase>
+</testsuite>
+</testsuites>

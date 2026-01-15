@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import * as pageFunctions from './page-functions';
-
+import { config } from './test-config';
 // Simple performance tracking
 const performanceStats: Array<{
   test: string;
@@ -13,7 +13,7 @@ test.describe('Checkout Process with Stats', () => {
   test.beforeEach(async ({ page }) => {
     console.time('setup');
     await pageFunctions.goto(page);
-    await pageFunctions.login(page);
+    await pageFunctions.connect(page);
     await expect(page).toHaveURL(/inventory.html/);
     console.timeEnd('setup');
   });
