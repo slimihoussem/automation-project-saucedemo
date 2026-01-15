@@ -6,7 +6,7 @@ pipeline {
     }
 
     environment {
-        VENV_DIR = "venv"
+        PYTHON_CMD = 'py'
     }
 
     stages {
@@ -17,10 +17,9 @@ pipeline {
             }
         }
 
-        /* =======================
+        /* =========================
            PLAYWRIGHT
-        ======================= */
-
+        ========================== */
         stage('Install Node.js Dependencies') {
             steps {
                 echo 'Installing Node.js dependencies...'
@@ -42,40 +41,32 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
                     archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
                 }
             }
         }
 
-        /* =======================
-           SELENIUM (Python)
-        ======================= */
-
-        stage('Setup Python Environment') {
+        /* =========================
+           SELENIUM (SCRIPT MODE)
+        ========================== */
+        stage('Install Python Dependencies') {
             steps {
-                echo 'Setting up Python virtual environment...'
+                echo 'Installing Python dependencies...'
                 bat '''
-                    py -m venv %VENV_DIR%
-                    call %VENV_DIR%\\Scripts\\activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
+                    %PYTHON_CMD% -m pip install --upgrade pip
+                    %PYTHON_CMD% -m pip install -r requirements.txt
                 '''
             }
         }
 
-        stage('Run Selenium Tests') {
+        stage('Run Selenium Tests (Script Mode)') {
             steps {
-                echo 'Running Selenium tests...'
+                echo 'Running Selenium tests (Python script)...'
                 bat '''
-                    call %VENV_DIR%\\Scripts\\activate
-                    pytest selenium_tests
+                    cd selenium_tests
+                    %PYTHON_CMD% TestConnexionError.py
                 '''
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'selenium_tests/**', allowEmptyArchive: true
-                }
             }
         }
     }
