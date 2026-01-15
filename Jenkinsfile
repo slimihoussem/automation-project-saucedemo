@@ -129,17 +129,6 @@ pipeline {
                     summary['Selenium'] = parseJUnitXml("${SELENIUM_REPORT_DIR}/selenium-results.xml")
                     summary['Robot Framework'] = parseJUnitXml("${ROBOT_REPORT_DIR}/output/xunit.xml")
 
-                    echo '================== TEST SUMMARY =================='
-                    summary.each { framework, tests ->
-                        echo "${framework}:"
-                        if (tests.size() == 0) {
-                            echo "  - No tests executed"
-                        } else {
-                            tests.each { t ->
-                                echo "  - ${t[0]}: ${t[1]}"
-                            }
-                        }
-                    }
                 }
             }
         }
