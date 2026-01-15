@@ -5,6 +5,10 @@ pipeline {
         timestamps()
     }
 
+    environment {
+        VENV_DIR = "venv"
+    }
+
     stages {
 
         stage('Checkout') {
@@ -12,6 +16,10 @@ pipeline {
                 checkout scm
             }
         }
+
+        /* =======================
+           PLAYWRIGHT
+        ======================= */
 
         stage('Install Node.js Dependencies') {
             steps {
@@ -34,8 +42,39 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
                     archiveArtifacts artifacts: 'test-results/**', allowEmptyArchive: true
+                }
+            }
+        }
+
+        /* =======================
+           SELENIUM (Python)
+        ======================= */
+
+        stage('Setup Python Environment') {
+            steps {
+                echo 'Setting up Python virtual environment...'
+                bat '''
+                    py -m venv %VENV_DIR%
+                    call %VENV_DIR%\\Scripts\\activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
+                '''
+            }
+        }
+
+        stage('Run Selenium Tests') {
+            steps {
+                echo 'Running Selenium tests...'
+                bat '''
+                    call %VENV_DIR%\\Scripts\\activate
+                    pytest selenium_tests
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'selenium_tests/**', allowEmptyArchive: true
                 }
             }
         }
@@ -43,10 +82,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Playwright tests passed'
+            echo '✅ Playwright + Selenium tests passed'
         }
         failure {
-            echo '❌ Playwright tests failed'
+            echo '❌ One or more test stages failed'
         }
         always {
             echo 'Pipeline finished'
