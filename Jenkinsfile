@@ -9,6 +9,9 @@ pipeline {
         PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
         SELENIUM_REPORT_DIR  = 'reports/selenium'
         ROBOT_REPORT_DIR     = 'reports/robot'
+        PLAYWRIGHT_STAGE_RESULT = 'NOT RUN'
+        SELENIUM_STAGE_RESULT = 'NOT RUN'
+        ROBOT_STAGE_RESULT = 'NOT RUN'
     }
 
     stages {
@@ -46,14 +49,17 @@ pipeline {
         stage('Run Playwright Tests') {
             steps {
                 script {
+                    echo 'Running Playwright tests...'
                     try {
-                        echo 'Running Playwright tests...'
-                        bat 'npx playwright test --reporter=list,junit --output=%PLAYWRIGHT_REPORT_DIR%'
-                        currentBuild.description = (currentBuild.description ?: '') + "Playwright: PASS; "
+                        bat """
+                        npx playwright test ^
+                        --reporter=list,junit ^
+                        --output=%PLAYWRIGHT_REPORT_DIR%
+                        """
                         env.PLAYWRIGHT_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        currentBuild.description = (currentBuild.description ?: '') + "Playwright: FAIL; "
                         env.PLAYWRIGHT_STAGE_RESULT = 'FAIL'
+                        echo "Playwright tests failed: ${e}"
                     }
                 }
             }
@@ -68,25 +74,22 @@ pipeline {
         stage('Install Python Dependencies') {
             steps {
                 echo 'Installing Python dependencies...'
-                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    bat 'py -m pip install --upgrade pip'
-                    bat 'py -m pip install -r requirements.txt'
-                }
+                bat 'py -m pip install --upgrade pip'
+                bat 'py -m pip install -r requirements.txt'
             }
         }
 
         stage('Run Selenium Tests') {
             steps {
                 script {
+                    echo 'Running Selenium tests...'
                     try {
-                        echo 'Running Selenium tests...'
-                        // Run all .py files in selenium_tests/ with pytest and JUnit XML output
-                        bat 'py -m pytest selenium_tests/ --junitxml=%SELENIUM_REPORT_DIR%/selenium-results.xml'
-                        currentBuild.description = (currentBuild.description ?: '') + "Selenium: PASS; "
+                        // Explicitly target the test file(s)
+                        bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports/selenium/selenium-results.xml'
                         env.SELENIUM_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        currentBuild.description = (currentBuild.description ?: '') + "Selenium: FAIL; "
                         env.SELENIUM_STAGE_RESULT = 'FAIL'
+                        echo "Selenium tests failed: ${e}"
                     }
                 }
             }
@@ -101,14 +104,18 @@ pipeline {
         stage('Run Robot Framework Tests') {
             steps {
                 script {
+                    echo 'Running Robot Framework tests...'
                     try {
-                        echo 'Running Robot Framework tests...'
-                        bat "py -m robot --outputdir ${ROBOT_REPORT_DIR}/output --xunit ${ROBOT_REPORT_DIR}/xunit.xml robot_tests/"
-                        currentBuild.description = (currentBuild.description ?: '') + "Robot: PASS; "
+                        bat """
+                        py -m robot ^
+                        --outputdir ${ROBOT_REPORT_DIR}/output ^
+                        --xunit ${ROBOT_REPORT_DIR}/xunit.xml ^
+                        robot_tests/
+                        """
                         env.ROBOT_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        currentBuild.description = (currentBuild.description ?: '') + "Robot: FAIL; "
                         env.ROBOT_STAGE_RESULT = 'FAIL'
+                        echo "Robot Framework tests failed: ${e}"
                     }
                 }
             }
@@ -122,18 +129,24 @@ pipeline {
 
         stage('Print Test Summary') {
             steps {
-                echo '==================== TEST SUMMARY ===================='
+                echo '=================== TEST SUMMARY ===================='
                 script {
-                    echo "- Playwright:      ${env.PLAYWRIGHT_STAGE_RESULT ?: 'NOT EXECUTED'}"
-                    echo "- Selenium:        ${env.SELENIUM_STAGE_RESULT ?: 'NOT EXECUTED'}"
-                    echo "- Robot Framework: ${env.ROBOT_STAGE_RESULT ?: 'NOT EXECUTED'}"
+                    echo "- Playwright:      ${env.PLAYWRIGHT_STAGE_RESULT}"
+                    echo "- Selenium:        ${env.SELENIUM_STAGE_RESULT}"
+                    echo "- Robot Framework: ${env.ROBOT_STAGE_RESULT}"
                 }
-                echo '======================================================'
+                echo '====================================================='
             }
         }
     }
 
     post {
+        success {
+            echo '✅ Pipeline finished successfully'
+        }
+        failure {
+            echo '❌ Pipeline finished with failures'
+        }
         always {
             echo 'Pipeline finished. Check reports/ directory for details.'
         }

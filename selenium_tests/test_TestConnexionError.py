@@ -57,7 +57,7 @@ def save_junit_xml(resultats, output_file="reports/selenium/selenium-results.xml
     tree.write(output_file, encoding="utf-8", xml_declaration=True)
     print(f"\n✅ JUnit XML saved to {output_file}")
 
-def run_tests():
+def test_run():
     """Exécute tous les tests de connexion"""
     afficher_introduction()
     
@@ -81,7 +81,7 @@ def run_tests():
 
     for i, scenario in enumerate(scenarios, 1):
         # Importer les fonctions
-        from selenium_tests.FunctionSauceDemo import ouvrir_chrome, fermer_chrome, aller_site, executer_scenario
+        from selenium_tests.test_FunctionSauceDemo import ouvrir_chrome, fermer_chrome, aller_site, executer_scenario
         
         print(f"\n📌 Test {i}/{total_tests} : {scenario['cas']}")
         driver = ouvrir_chrome(use_portable=use_portable)
@@ -130,7 +130,7 @@ def run_tests():
 
 def main():
     try:
-        run_tests()
+        test_run()
     except KeyboardInterrupt:
         print("⏹️ Tests interrompus par l'utilisateur")
     except Exception as e:
