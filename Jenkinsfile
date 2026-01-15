@@ -1,20 +1,57 @@
 pipeline {
     agent any
 
+    options {
+        timestamps()
+    }
+
     stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // ---------------- NODE / Playwright ----------------
+        stage('Install Node.js Dependencies') {
+            steps {
+                echo 'Installing Node.js dependencies...'
+                bat 'npm install'
+            }
+        }
+
+        stage('Install Playwright Browsers') {
+            steps {
+                echo 'Installing Playwright browsers...'
+                bat 'npx playwright install'
+            }
+        }
 
         stage('Run Playwright Tests') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Playwright tests...'
-                    bat 'npx playwright test --reporter=html,junit --output=playwright-report'
+                    bat 'npx playwright test --reporter=html,junit --output=reports/playwright'
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'playwright-report/**', allowEmptyArchive: true
-                    junit 'playwright-report/junit-results.xml'
+                    echo 'Archiving Playwright artifacts...'
+                    archiveArtifacts artifacts: 'reports/playwright/**', allowEmptyArchive: true
+
+                    echo 'Publishing Playwright JUnit results...'
+                    junit allowEmptyResults: true, testResults: 'reports/playwright/junit-results/*.xml'
                 }
+            }
+        }
+
+        // ---------------- PYTHON / Selenium ----------------
+        stage('Install Python Dependencies') {
+            steps {
+                echo 'Installing Python dependencies...'
+                bat 'py -m pip install --upgrade pip'
+                bat 'py -m pip install -r requirements.txt'
             }
         }
 
@@ -22,41 +59,49 @@ pipeline {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Selenium tests...'
-                    bat '''
-                    cd selenium_tests
-                    py TestConnexionError.py > ../test-results/selenium_results/output.txt 2>&1
-                    '''
+                    bat 'cd selenium_tests && py -m pytest --junitxml=../reports/selenium/results.xml'
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'test-results/selenium_results/**', allowEmptyArchive: true
+                    echo 'Archiving Selenium artifacts...'
+                    archiveArtifacts artifacts: 'reports/selenium/**', allowEmptyArchive: true
+
+                    echo 'Publishing Selenium JUnit results...'
+                    junit allowEmptyResults: true, testResults: 'reports/selenium/results.xml'
                 }
             }
         }
 
+        // ---------------- PYTHON / Robot Framework ----------------
         stage('Run Robot Framework Tests') {
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                     echo 'Running Robot Framework tests...'
-                    bat '''
-                    cd robot_tests
-                    py -m robot --outputdir ../test-results/robot_results .
-                    '''
+                    bat 'cd robot_tests && py -m robot --outputdir ../reports/robot .'
                 }
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'test-results/robot_results/**', allowEmptyArchive: true
-                    junit 'test-results/robot_results/output.xml'
+                    echo 'Archiving Robot Framework artifacts...'
+                    archiveArtifacts artifacts: 'reports/robot/**', allowEmptyArchive: true
+
+                    echo 'Publishing Robot Framework JUnit results...'
+                    junit allowEmptyResults: true, testResults: 'reports/robot/output.xml'
                 }
             }
         }
     }
 
     post {
+        success {
+            echo '✅ All stages completed successfully (tests may still have failed individually)'
+        }
+        failure {
+            echo '❌ One or more stages failed. Check reports/ directory and JUnit results.'
+        }
         always {
-            echo 'Pipeline finished. Check archived artifacts for details.'
+            echo 'Pipeline finished. All reports are in reports/ directory.'
         }
     }
 }
