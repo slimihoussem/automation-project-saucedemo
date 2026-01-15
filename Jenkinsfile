@@ -9,9 +9,6 @@ pipeline {
         PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
         SELENIUM_REPORT_DIR  = 'reports/selenium'
         ROBOT_REPORT_DIR     = 'reports/robot'
-        PLAYWRIGHT_STAGE_RESULT = 'NOT RUN'
-        SELENIUM_STAGE_RESULT = 'NOT RUN'
-        ROBOT_STAGE_RESULT = 'NOT RUN'
     }
 
     stages {
@@ -49,24 +46,22 @@ pipeline {
         stage('Run Playwright Tests') {
             steps {
                 script {
-                    echo 'Running Playwright tests...'
                     try {
+                        echo 'Running Playwright tests...'
                         bat """
                         npx playwright test ^
                         --reporter=list,junit ^
                         --output=%PLAYWRIGHT_REPORT_DIR%
                         """
-                        env.PLAYWRIGHT_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        env.PLAYWRIGHT_STAGE_RESULT = 'FAIL'
-                        echo "Playwright tests failed: ${e}"
+                        echo "Playwright tests failed"
                     }
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/junit.xml"
+                    junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/**/junit.xml"
                 }
             }
         }
@@ -82,14 +77,11 @@ pipeline {
         stage('Run Selenium Tests') {
             steps {
                 script {
-                    echo 'Running Selenium tests...'
                     try {
-                        // Explicitly target the test file(s)
+                        echo 'Running Selenium tests...'
                         bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports/selenium/selenium-results.xml'
-                        env.SELENIUM_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        env.SELENIUM_STAGE_RESULT = 'FAIL'
-                        echo "Selenium tests failed: ${e}"
+                        echo "Selenium tests failed"
                     }
                 }
             }
@@ -104,38 +96,76 @@ pipeline {
         stage('Run Robot Framework Tests') {
             steps {
                 script {
-                    echo 'Running Robot Framework tests...'
                     try {
+                        echo 'Running Robot Framework tests...'
                         bat """
                         py -m robot ^
                         --outputdir ${ROBOT_REPORT_DIR}/output ^
-                        --xunit ${ROBOT_REPORT_DIR}/xunit.xml ^
+                        --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
                         robot_tests/
                         """
-                        env.ROBOT_STAGE_RESULT = 'PASS'
                     } catch (Exception e) {
-                        env.ROBOT_STAGE_RESULT = 'FAIL'
-                        echo "Robot Framework tests failed: ${e}"
+                        echo "Robot Framework tests failed"
                     }
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
-                    junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/xunit.xml"
+                    junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
                 }
             }
         }
 
         stage('Print Test Summary') {
             steps {
-                echo '=================== TEST SUMMARY ===================='
                 script {
-                    echo "- Playwright:      ${env.PLAYWRIGHT_STAGE_RESULT}"
-                    echo "- Selenium:        ${env.SELENIUM_STAGE_RESULT}"
-                    echo "- Robot Framework: ${env.ROBOT_STAGE_RESULT}"
+                    echo '=================== TEST SUMMARY ===================='
+
+                    // Helper function to parse JUnit XML
+                    def parseJUnit = { path ->
+                        def summary = []
+                        if (fileExists(path)) {
+                            def xml = readFile(path)
+                            def parser = new XmlSlurper().parseText(xml)
+                            parser.testsuite.testcase.each { tc ->
+                                def name = tc.@name.toString()
+                                def status = tc.failure.size() > 0 ? 'FAIL' : 'PASS'
+                                summary << [name: name, status: status]
+                            }
+                        }
+                        return summary
+                    }
+
+                    // Playwright
+                    def pw_tests = parseJUnit("${PLAYWRIGHT_REPORT_DIR}/**/junit.xml")
+                    echo "Playwright:"
+                    if (pw_tests.isEmpty()) {
+                        echo "  - No tests executed"
+                    } else {
+                        pw_tests.each { t -> echo "  - ${t.name}: ${t.status}" }
+                    }
+
+                    // Selenium
+                    def selenium_tests = parseJUnit("${SELENIUM_REPORT_DIR}/selenium-results.xml")
+                    echo "Selenium:"
+                    if (selenium_tests.isEmpty()) {
+                        echo "  - No tests executed"
+                    } else {
+                        selenium_tests.each { t -> echo "  - ${t.name}: ${t.status}" }
+                    }
+
+                    // Robot Framework
+                    def robot_tests = parseJUnit("${ROBOT_REPORT_DIR}/output/xunit.xml")
+                    echo "Robot Framework:"
+                    if (robot_tests.isEmpty()) {
+                        echo "  - No tests executed"
+                    } else {
+                        robot_tests.each { t -> echo "  - ${t.name}: ${t.status}" }
+                    }
+
+                    echo '====================================================='
                 }
-                echo '====================================================='
             }
         }
     }
