@@ -18,7 +18,7 @@
   "homepage": "https://github.com/slimihoussem/automation-project-saucedemo#readme",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
-    "@types/node": "^25.0.6",
+    "@types/node": "^25.0.6"
   }
   
 }
