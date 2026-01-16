@@ -6,11 +6,11 @@ pipeline {
     }
 
     environment {
-        PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
-        SELENIUM_REPORT_DIR  = 'reports/selenium'
-        ROBOT_REPORT_DIR     = 'reports/robot'
-        ALLURE_RESULTS_DIR   = 'reports/allure'
-        ALLURE_GLOBAL_HTML   = 'reports/allure/global-html'
+        PLAYWRIGHT_REPORT_DIR = 'reports/allure/playwright'
+        SELENIUM_REPORT_DIR  = 'reports/allure/selenium'
+        ROBOT_REPORT_DIR     = 'reports/allure/robot'
+        ALLURE_COMBINED_DIR  = 'reports/allure/combined'
+        ALLURE_HTML_DIR      = 'reports/allure/global-html'
     }
 
     stages {
@@ -25,10 +25,12 @@ pipeline {
             steps {
                 echo 'Preparing reports directories...'
                 bat 'if not exist reports mkdir reports'
-                bat 'if not exist reports\\playwright mkdir reports\\playwright'
-                bat 'if not exist reports\\selenium mkdir reports\\selenium'
-                bat 'if not exist reports\\robot mkdir reports\\robot'
                 bat 'if not exist reports\\allure mkdir reports\\allure'
+                bat "if not exist ${PLAYWRIGHT_REPORT_DIR} mkdir ${PLAYWRIGHT_REPORT_DIR}"
+                bat "if not exist ${SELENIUM_REPORT_DIR} mkdir ${SELENIUM_REPORT_DIR}"
+                bat "if not exist ${ROBOT_REPORT_DIR} mkdir ${ROBOT_REPORT_DIR}"
+                bat "if not exist ${ALLURE_COMBINED_DIR} mkdir ${ALLURE_COMBINED_DIR}"
+                bat "if not exist ${ALLURE_HTML_DIR} mkdir ${ALLURE_HTML_DIR}"
             }
         }
 
@@ -38,14 +40,14 @@ pipeline {
                     steps {
                         bat 'npm install'
                         bat 'npx playwright install'
+                        bat 'npm install -D @shelex/allure-playwright'
                     }
                 }
                 stage('Python Dependencies') {
                     steps {
-                        // ✅ Fixed: Removed robotframework-allure
                         bat 'py -m pip install --upgrade pip'
                         bat 'py -m pip install -r requirements.txt'
-                        bat 'py -m pip install allure-pytest'
+                        bat 'py -m pip install allure-pytest allure-robotframework'
                     }
                 }
             }
@@ -59,11 +61,8 @@ pipeline {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
                             npx playwright test playwright_tests/paiement_process.spec.ts ^
-                            --reporter=junit ^
-                            --output=${PLAYWRIGHT_REPORT_DIR}/checkout
-                            npx playwright test playwright_tests/paiement_process.spec.ts ^
                             --reporter=allure-playwright ^
-                            --output=${ALLURE_RESULTS_DIR}/playwright
+                            --output=${PLAYWRIGHT_REPORT_DIR}
                             """
                         }
                     }
@@ -74,11 +73,8 @@ pipeline {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
                             npx playwright test playwright_tests/product-filter.spec.ts ^
-                            --reporter=junit ^
-                            --output=${PLAYWRIGHT_REPORT_DIR}/product-filter
-                            npx playwright test playwright_tests/product-filter.spec.ts ^
                             --reporter=allure-playwright ^
-                            --output=${ALLURE_RESULTS_DIR}/playwright
+                            --output=${PLAYWRIGHT_REPORT_DIR}
                             """
                         }
                     }
@@ -87,11 +83,7 @@ pipeline {
                 stage('Selenium - TestSauceDemo') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat """
-                            py -m pytest selenium_tests/TestSauceDemo.py ^
-                            --junitxml=${SELENIUM_REPORT_DIR}/test-sauce-demo.xml ^
-                            --alluredir=${ALLURE_RESULTS_DIR}/selenium
-                            """
+                            bat "py -m pytest selenium_tests/TestSauceDemo.py --alluredir=${SELENIUM_REPORT_DIR}"
                         }
                     }
                 }
@@ -99,11 +91,7 @@ pipeline {
                 stage('Selenium - Check Products') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat """
-                            py -m pytest selenium_tests/Tests_Check_Products.py ^
-                            --junitxml=${SELENIUM_REPORT_DIR}/test-products.xml ^
-                            --alluredir=${ALLURE_RESULTS_DIR}/selenium
-                            """
+                            bat "py -m pytest selenium_tests/Tests_Check_Products.py --alluredir=${SELENIUM_REPORT_DIR}"
                         }
                     }
                 }
@@ -114,59 +102,36 @@ pipeline {
                             bat """
                             py -m robot ^
                             --listener allure_robotframework.listener:AllureListener ^
-                            --outputdir reports/allure/robot ^
+                            --outputdir ${ROBOT_REPORT_DIR} ^
                             robot_tests
                             """
                         }
                     }
                 }
-
             }
         }
 
         stage('Generate Global Allure HTML Report') {
             steps {
-                script {
-                    echo 'Merging Allure results and generating global HTML report...'
-                    // Merge all results into one folder
-                    bat 'mkdir reports\\allure\\combined'
-                    bat 'xcopy /s /y reports\\allure\\playwright\\* reports\\allure\\combined\\'
-                    bat 'xcopy /s /y reports\\allure\\selenium\\* reports\\allure\\combined\\'
-                    bat 'xcopy /s /y reports\\allure\\robot\\* reports\\allure\\combined\\'
-                    // Generate global HTML report
-                    bat "allure generate reports\\allure\\combined --clean -o ${ALLURE_GLOBAL_HTML}"
-                }
+                echo 'Merging Allure results and generating global HTML report...'
+                bat "xcopy /s /y ${PLAYWRIGHT_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\"
+                bat "xcopy /s /y ${SELENIUM_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\"
+                bat "xcopy /s /y ${ROBOT_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\"
+                bat "allure generate ${ALLURE_COMBINED_DIR} --clean -o ${ALLURE_HTML_DIR}"
             }
         }
 
         stage('Archive Artifacts & Publish Reports') {
             steps {
                 echo 'Archiving artifacts and publishing test results...'
-
-                // Playwright
-                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/checkout/**", allowEmptyArchive: true
-                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/checkout/**/junit.xml"
-
-                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**", allowEmptyArchive: true
-                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**/junit.xml"
-
-                // Selenium
-                archiveArtifacts artifacts: "${SELENIUM_REPORT_DIR}/**", allowEmptyArchive: true
-                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/*.xml"
-
-                // Robot
-                archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
-                junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
-
-                // Global Allure HTML
-                archiveArtifacts artifacts: "${ALLURE_GLOBAL_HTML}/**", allowEmptyArchive: true
+                archiveArtifacts artifacts: 'reports/allure/global-html/**', allowEmptyArchive: true
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished. Check reports/ directory for all artifacts and test results.'
+            echo 'Pipeline finished. Check reports/allure/global-html/index.html for combined report.'
         }
     }
 }

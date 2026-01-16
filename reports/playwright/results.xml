@@ -1,13 +1,13 @@
-<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="10.834597999999765">
-<testsuite name="Paiment_processus.spec.ts" timestamp="2026-01-16T20:03:05.104Z" hostname="chromium" tests="2" failures="0" skipped="0" time="13.466" errors="0">
-<testcase name="Checkout Process with Stats › Complete checkout with one item" classname="Paiment_processus.spec.ts" time="5.909">
+<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="8.868027999999933">
+<testsuite name="Paiment_processus.spec.ts" timestamp="2026-01-16T20:12:53.344Z" hostname="chromium" tests="2" failures="0" skipped="0" time="11.646" errors="0">
+<testcase name="Checkout Process with Stats › Complete checkout with one item" classname="Paiment_processus.spec.ts" time="6.778">
 <system-out>
-<![CDATA[setup: 5.050s
-add-to-cart: 42.939ms
-go-to-cart: 54.681ms
-checkout-process: 156.751ms
-complete-purchase: 43.852ms
-✅ Test completed in 326ms
+<![CDATA[setup: 6.142s
+add-to-cart: 16.024ms
+go-to-cart: 46.505ms
+checkout-process: 152.351ms
+complete-purchase: 75.402ms
+✅ Test completed in 316ms
 
 📊 Test Statistics Summary:
 ==========================
@@ -15,18 +15,18 @@ Total Tests: 1
 Passed: 1
 Failed: 0
 Success Rate: 100.0%
-Total Execution Time: 326ms
-Average Test Duration: 326ms
+Total Execution Time: 316ms
+Average Test Duration: 316ms
 
 Individual Test Results:
-✅ Complete checkout with one item: 326ms
+✅ Complete checkout with one item: 316ms
 ]]>
 </system-out>
 </testcase>
-<testcase name="Checkout Process with Stats › Checkout with multiple items" classname="Paiment_processus.spec.ts" time="7.557">
+<testcase name="Checkout Process with Stats › Checkout with multiple items" classname="Paiment_processus.spec.ts" time="4.868">
 <system-out>
-<![CDATA[setup: 6.226s
-✅ Test completed in 521ms
+<![CDATA[setup: 4.157s
+✅ Test completed in 361ms
 
 📊 Test Statistics Summary:
 ==========================
@@ -34,11 +34,11 @@ Total Tests: 1
 Passed: 1
 Failed: 0
 Success Rate: 100.0%
-Total Execution Time: 521ms
-Average Test Duration: 521ms
+Total Execution Time: 361ms
+Average Test Duration: 361ms
 
 Individual Test Results:
-✅ Checkout with multiple items: 521ms
+✅ Checkout with multiple items: 361ms
 ]]>
 </system-out>
 </testcase>
