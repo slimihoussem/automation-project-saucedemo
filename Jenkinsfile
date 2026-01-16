@@ -1,37 +1,33 @@
 pipeline {
     agent any
-
-    options {
-        timestamps()
-    }
-
     environment {
-        PLAYWRIGHT_REPORT_DIR = 'reports\\allure\\playwright'
-        SELENIUM_REPORT_DIR  = 'reports\\allure\\selenium'
-        ROBOT_REPORT_DIR     = 'reports\\allure\\robot'
-        ALLURE_COMBINED_DIR  = 'reports\\allure\\combined'
-        ALLURE_HTML_DIR      = 'reports\\allure\\global-html'
+        PYTHON = "py"
+        NODE = "npm"
+        REPORTS_DIR = "reports\\allure"
+        COMBINED_DIR = "${REPORTS_DIR}\\combined"
+        GLOBAL_HTML = "${REPORTS_DIR}\\global-html"
     }
-
     stages {
 
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
-                checkout scm
+                echo "Checking out code..."
+                checkout([$class: 'GitSCM', 
+                          branches: [[name: '*/main']], 
+                          userRemoteConfigs: [[url: 'https://github.com/slimihoussem/automation-project-saucedemo.git', credentialsId: 'github_cred']]])
             }
         }
 
         stage('Prepare Reports Directory') {
             steps {
-                echo 'Preparing reports directories...'
+                echo "Preparing reports directories..."
                 bat """
-                    if not exist reports mkdir reports
-                    if not exist reports\\allure mkdir reports\\allure
-                    if not exist ${PLAYWRIGHT_REPORT_DIR} mkdir ${PLAYWRIGHT_REPORT_DIR}
-                    if not exist ${SELENIUM_REPORT_DIR} mkdir ${SELENIUM_REPORT_DIR}
-                    if not exist ${ROBOT_REPORT_DIR} mkdir ${ROBOT_REPORT_DIR}
-                    if not exist ${ALLURE_COMBINED_DIR} mkdir ${ALLURE_COMBINED_DIR}
-                    if not exist ${ALLURE_HTML_DIR} mkdir ${ALLURE_HTML_DIR}
+                    if not exist ${REPORTS_DIR} mkdir ${REPORTS_DIR}
+                    if not exist ${REPORTS_DIR}\\playwright mkdir ${REPORTS_DIR}\\playwright
+                    if not exist ${REPORTS_DIR}\\selenium mkdir ${REPORTS_DIR}\\selenium
+                    if not exist ${REPORTS_DIR}\\robot mkdir ${REPORTS_DIR}\\robot
+                    if not exist ${COMBINED_DIR} mkdir ${COMBINED_DIR}
+                    if not exist ${GLOBAL_HTML} mkdir ${GLOBAL_HTML}
                 """
             }
         }
@@ -40,20 +36,17 @@ pipeline {
             parallel {
                 stage('Node & Playwright') {
                     steps {
-                        bat """
-                            npm install
-                            npx playwright install
-                            npm install -D @shelex/allure-playwright
-                        """
+                        echo "Installing Node & Playwright dependencies..."
+                        bat "npm install"
+                        bat "npx playwright install"
                     }
                 }
                 stage('Python Dependencies') {
                     steps {
-                        bat """
-                            py -m pip install --upgrade pip
-                            py -m pip install -r requirements.txt
-                            py -m pip install allure-pytest allure-robotframework
-                        """
+                        echo "Installing Python dependencies..."
+                        bat "${PYTHON} -m pip install --upgrade pip"
+                        bat "${PYTHON} -m pip install -r requirements.txt"
+                        bat "${PYTHON} -m pip install allure-pytest allure-robotframework"
                     }
                 }
             }
@@ -62,84 +55,60 @@ pipeline {
         stage('Run Tests') {
             parallel {
 
-                stage('Playwright - Checkout') {
+                stage('Playwright Tests') {
                     steps {
+                        echo "Running Playwright tests..."
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat """
-                                npx playwright test playwright_tests/paiement_process.spec.ts ^
-                                --reporter=allure-playwright ^
-                                --output=${PLAYWRIGHT_REPORT_DIR}
-                            """
+                            bat "npx playwright test playwright_tests/paiement_process.spec.ts --reporter=@shelex/allure-playwright --output=${REPORTS_DIR}\\playwright"
+                            bat "npx playwright test playwright_tests/product-filter.spec.ts --reporter=@shelex/allure-playwright --output=${REPORTS_DIR}\\playwright"
                         }
                     }
                 }
 
-                stage('Playwright - Product Filter') {
+                stage('Selenium Tests') {
                     steps {
+                        echo "Running Selenium tests..."
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat """
-                                npx playwright test playwright_tests/product-filter.spec.ts ^
-                                --reporter=allure-playwright ^
-                                --output=${PLAYWRIGHT_REPORT_DIR}
-                            """
-                        }
-                    }
-                }
-
-                stage('Selenium - TestSauceDemo') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat "py -m pytest selenium_tests/TestSauceDemo.py --alluredir=${SELENIUM_REPORT_DIR}"
-                        }
-                    }
-                }
-
-                stage('Selenium - Check Products') {
-                    steps {
-                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat "py -m pytest selenium_tests/Tests_Check_Products.py --alluredir=${SELENIUM_REPORT_DIR}"
+                            bat "${PYTHON} -m pytest selenium_tests/TestSauceDemo.py --alluredir=${REPORTS_DIR}\\selenium"
+                            bat "${PYTHON} -m pytest selenium_tests/Tests_Check_Products.py --alluredir=${REPORTS_DIR}\\selenium"
                         }
                     }
                 }
 
                 stage('Robot Framework Tests') {
                     steps {
+                        echo "Running Robot Framework tests..."
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat """
-                                py -m robot ^
-                                --listener allure_robotframework.listener:AllureListener ^
-                                --outputdir ${ROBOT_REPORT_DIR} ^
-                                robot_tests
-                            """
+                            bat "${PYTHON} -m robot --listener allure_robotframework --outputdir ${REPORTS_DIR}\\robot robot_tests"
                         }
                     }
                 }
+
             }
         }
 
         stage('Generate Global Allure HTML Report') {
             steps {
-                echo 'Merging Allure results and generating global HTML report...'
+                echo "Merging Allure results and generating global HTML report..."
                 bat """
-                    xcopy /s /y ${PLAYWRIGHT_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\
-                    xcopy /s /y ${SELENIUM_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\
-                    xcopy /s /y ${ROBOT_REPORT_DIR}\\* ${ALLURE_COMBINED_DIR}\\
-                    allure generate ${ALLURE_COMBINED_DIR} --clean -o ${ALLURE_HTML_DIR}
+                    xcopy /s /y ${REPORTS_DIR}\\playwright\\* ${COMBINED_DIR}\\
+                    xcopy /s /y ${REPORTS_DIR}\\selenium\\* ${COMBINED_DIR}\\
+                    xcopy /s /y ${REPORTS_DIR}\\robot\\* ${COMBINED_DIR}\\
+                    allure generate ${COMBINED_DIR} --clean -o ${GLOBAL_HTML}
                 """
             }
         }
 
         stage('Archive Artifacts') {
             steps {
-                echo 'Archiving global HTML report...'
-                archiveArtifacts artifacts: 'reports\\allure\\global-html\\**', allowEmptyArchive: true
+                archiveArtifacts artifacts: "${GLOBAL_HTML}\\**", fingerprint: true
             }
         }
     }
 
     post {
         always {
-            echo 'Pipeline finished. Check reports\\allure\\global-html\\index.html for combined report.'
+            echo "Pipeline finished. Check the combined report at ${GLOBAL_HTML}\\index.html"
         }
     }
 }
