@@ -1,8 +1,46 @@
-<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="4.128955000000074">
-<testsuite name="product-filter.spec.ts" timestamp="2026-01-15T17:14:11.913Z" hostname="chromium" tests="2" failures="0" skipped="0" time="0.87" errors="0">
-<testcase name="Product sorting tests › Sort by price low to high" classname="product-filter.spec.ts" time="0.479">
+<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="10.834597999999765">
+<testsuite name="Paiment_processus.spec.ts" timestamp="2026-01-16T20:03:05.104Z" hostname="chromium" tests="2" failures="0" skipped="0" time="13.466" errors="0">
+<testcase name="Checkout Process with Stats › Complete checkout with one item" classname="Paiment_processus.spec.ts" time="5.909">
+<system-out>
+<![CDATA[setup: 5.050s
+add-to-cart: 42.939ms
+go-to-cart: 54.681ms
+checkout-process: 156.751ms
+complete-purchase: 43.852ms
+✅ Test completed in 326ms
+
+📊 Test Statistics Summary:
+==========================
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+Total Execution Time: 326ms
+Average Test Duration: 326ms
+
+Individual Test Results:
+✅ Complete checkout with one item: 326ms
+]]>
+</system-out>
 </testcase>
-<testcase name="Product sorting tests › Sort by price high to low" classname="product-filter.spec.ts" time="0.391">
+<testcase name="Checkout Process with Stats › Checkout with multiple items" classname="Paiment_processus.spec.ts" time="7.557">
+<system-out>
+<![CDATA[setup: 6.226s
+✅ Test completed in 521ms
+
+📊 Test Statistics Summary:
+==========================
+Total Tests: 1
+Passed: 1
+Failed: 0
+Success Rate: 100.0%
+Total Execution Time: 521ms
+Average Test Duration: 521ms
+
+Individual Test Results:
+✅ Checkout with multiple items: 521ms
+]]>
+</system-out>
 </testcase>
 </testsuite>
 </testsuites>
