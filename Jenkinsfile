@@ -1,34 +1,28 @@
 pipeline {
     agent any
-
-    options {
-        timestamps()
-    }
+    options { timestamps() }
 
     environment {
-        PLAYWRIGHT_REPORT_DIR = 'reports\\playwright'
-        SELENIUM_REPORT_DIR   = 'reports\\allure\\selenium-html'
-        ROBOT_REPORT_DIR      = 'reports\\allure\\robot-html'
-        GLOBAL_REPORT_DIR     = 'reports\\allure\\global-html'
+        PLAYWRIGHT_DIR = 'reports/playwright-json'
+        SELENIUM_DIR   = 'reports/selenium-json'
+        ROBOT_DIR      = 'reports/robot-xml'
+        GLOBAL_HTML    = 'reports/global-test-report.html'
     }
 
     stages {
 
         stage('Checkout') {
-            steps {
-                echo 'Checking out code...'
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
-        stage('Prepare Reports Directory') {
+        stage('Prepare Directories') {
             steps {
-                echo 'Preparing reports directories...'
-                bat 'if not exist reports mkdir reports'
-                bat "if not exist ${PLAYWRIGHT_REPORT_DIR} mkdir ${PLAYWRIGHT_REPORT_DIR}"
-                bat "if not exist ${SELENIUM_REPORT_DIR} mkdir ${SELENIUM_REPORT_DIR}"
-                bat "if not exist ${ROBOT_REPORT_DIR} mkdir ${ROBOT_REPORT_DIR}"
-                bat "if not exist ${GLOBAL_REPORT_DIR} mkdir ${GLOBAL_REPORT_DIR}"
+                bat """
+                if not exist reports mkdir reports
+                if not exist ${PLAYWRIGHT_DIR} mkdir ${PLAYWRIGHT_DIR}
+                if not exist ${SELENIUM_DIR} mkdir ${SELENIUM_DIR}
+                if not exist ${ROBOT_DIR} mkdir ${ROBOT_DIR}
+                """
             }
         }
 
@@ -36,17 +30,14 @@ pipeline {
             parallel {
                 stage('Node & Playwright') {
                     steps {
-                        echo 'Installing Node & Playwright dependencies...'
                         bat 'npm install'
                         bat 'npx playwright install'
                     }
                 }
                 stage('Python Dependencies') {
                     steps {
-                        echo 'Installing Python dependencies...'
                         bat 'py -m pip install --upgrade pip'
-                        bat 'py -m pip install -r requirements.txt'
-                        bat 'py -m pip install allure-pytest allure-robotframework'
+                        bat 'py -m pip install -r requirements.txt pytest-json-report robotframework selenium'
                     }
                 }
             }
@@ -54,60 +45,76 @@ pipeline {
 
         stage('Run Tests') {
             parallel {
-
-                stage('Playwright Tests') {
+                stage('Playwright') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Playwright tests...'
                             bat """
-                                npx playwright test playwright_tests/paiement_process.spec.ts --reporter=html --output=${PLAYWRIGHT_REPORT_DIR}
-                                npx playwright test playwright_tests/product-filter.spec.ts --reporter=html --output=${PLAYWRIGHT_REPORT_DIR}
+                            npx playwright test playwright_tests/paiement_process.spec.ts --reporter=json:${PLAYWRIGHT_DIR}/paiement.json
+                            npx playwright test playwright_tests/product-filter.spec.ts --reporter=json:${PLAYWRIGHT_DIR}/product-filter.json
                             """
                         }
                     }
                 }
 
-                stage('Selenium Tests') {
+                stage('Selenium') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Selenium tests...'
                             bat """
-                                py -m pytest selenium_tests/TestSauceDemo.py --alluredir=reports\\allure\\selenium
-                                py -m pytest selenium_tests/Tests_Check_Products.py --alluredir=reports\\allure\\selenium
-                                allure generate reports\\allure\\selenium -o ${SELENIUM_REPORT_DIR} --clean
+                            py -m pytest selenium_tests/TestSauceDemo.py --json-report --json-report-file=${SELENIUM_DIR}/test1.json
+                            py -m pytest selenium_tests/Tests_Check_Products.py --json-report --json-report-file=${SELENIUM_DIR}/test2.json
                             """
                         }
                     }
                 }
 
-                stage('Robot Framework Tests') {
+                stage('Robot') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            echo 'Running Robot Framework tests...'
-                            bat """
-                                py -m robot --listener allure_robotframework --outputdir reports\\allure\\robot robot_tests
-                                allure generate reports\\allure\\robot -o ${ROBOT_REPORT_DIR} --clean
-                            """
+                            bat "py -m robot --output ${ROBOT_DIR}/robot_output.xml robot_tests"
                         }
                     }
                 }
-
             }
         }
 
-        stage('Generate Global HTML Report') {
+        stage('Generate Global HTML') {
             steps {
-                echo 'Merging all HTML reports into a single global report...'
+                echo "Generating global HTML report..."
                 bat """
-                    npm install -g merge-html-reports
-                    merge-html-reports -d ${PLAYWRIGHT_REPORT_DIR},${SELENIUM_REPORT_DIR},${ROBOT_REPORT_DIR} -o ${GLOBAL_REPORT_DIR}
+                py - <<END
+import os, json, xml.etree.ElementTree as ET
+html = '<html><head><title>Global Test Report</title><style>body{font-family:Arial;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #333;padding:8px;text-align:left;}th{background:#eee;}.pass{background:#c6efce;}.fail{background:#ffc7ce;}</style></head><body><h1>Global Test Report</h1><table><tr><th>Framework</th><th>Test Name</th><th>Status</th></tr>'
+for d,framework in [('${PLAYWRIGHT_DIR}','Playwright'),('${SELENIUM_DIR}','Selenium')]:
+    if os.path.exists(d):
+        for f in os.listdir(d):
+            if f.endswith('.json'):
+                data = json.load(open(os.path.join(d,f)))
+                for t in data.get('suites', []) if framework=='Playwright' else data.get('tests', []):
+                    if framework=='Playwright':
+                        for test in t.get('tests', []):
+                            status = 'pass' if test['status']=='passed' else 'fail'
+                            html += f"<tr><td>{framework}</td><td>{test['title']}</td><td class='{status}'>{status.upper()}</td></tr>"
+                    else:
+                        status = 'pass' if t['outcome']=='passed' else 'fail'
+                        html += f"<tr><td>{framework}</td><td>{t['nodeid']}</td><td class='{status}'>{status.upper()}</td></tr>"
+robot_dir = '${ROBOT_DIR}'
+if os.path.exists(robot_dir):
+    for f in os.listdir(robot_dir):
+        if f.endswith('.xml'):
+            tree = ET.parse(os.path.join(robot_dir,f))
+            for test in tree.findall('.//test'):
+                s = test.find('status').attrib.get('status')
+                cls = 'pass' if s=='PASS' else 'fail'
+                html += f"<tr><td>Robot</td><td>{test.attrib.get('name')}</td><td class='{cls}'>{s}</td></tr>"
+html += '</table></body></html>'
+with open('${GLOBAL_HTML}','w',encoding='utf-8') as o: o.write(html)
+END
                 """
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('Archive Report') {
             steps {
-                echo 'Archiving all reports...'
                 archiveArtifacts artifacts: 'reports/**', allowEmptyArchive: true
             }
         }
@@ -115,7 +122,7 @@ pipeline {
 
     post {
         always {
-            echo 'Pipeline finished. Open reports\\allure\\global-html\\index.html for combined test report.'
+            echo "Pipeline finished. Open ${GLOBAL_HTML} for full test report."
         }
     }
 }
