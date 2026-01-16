@@ -10,15 +10,16 @@ import xml.etree.ElementTree as ET
 CHROME_PORTABLE_PATH = r'C:\Chrome_Sources\chrome-win64\chrome.exe'
 CHROME_DRIVER_PATH = r'C:\Chrome_Sources\chromedriver-win64\chromedriver.exe'
 URL = "https://www.saucedemo.com/"
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ==============================================
 # FUNCTIONS
 # ==============================================
 
-def charger_donnees(json_path="selenium_tests/ConnexionError.json"):
-    """Charge les données de test depuis le fichier JSON"""
-    with open(json_path, 'r', encoding='utf-8') as file:
-        return json.load(file)
+def charger_donnees(json_filename="ConnexionError.json"):
+    json_path = os.path.join(BASE_DIR, json_filename)
+    with open(json_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
 
 def afficher_introduction():
     """Affiche l'introduction du programme"""

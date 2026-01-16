@@ -31,12 +31,14 @@ pipeline {
 
         stage('Install Dependencies') {
             parallel {
+
                 stage('Node & Playwright') {
                     steps {
                         bat 'npm install'
                         bat 'npx playwright install'
                     }
                 }
+
                 stage('Python Dependencies') {
                     steps {
                         bat 'py -m pip install --upgrade pip'
@@ -48,6 +50,8 @@ pipeline {
 
         stage('Run Tests') {
             parallel {
+
+                // ================= PLAYWRIGHT =================
 
                 stage('Playwright - Checkout') {
                     steps {
@@ -73,13 +77,31 @@ pipeline {
                     }
                 }
 
-                stage('Selenium Tests') {
+                // ================= SELENIUM =================
+
+                stage('Selenium - TestSauceDemo') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                            bat 'py -m pytest selenium_tests/test_TestConnexionError.py --junitxml=reports/selenium/selenium-results.xml'
+                            bat '''
+                            py -m pytest selenium_tests/TestSauceDemo.py ^
+                            --junitxml=reports/selenium/test-sauce-demo.xml
+                            '''
                         }
                     }
                 }
+
+                stage('Selenium - Check Products') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            bat '''
+                            py -m pytest selenium_tests/Tests_Check_Products.py ^
+                            --junitxml=reports/selenium/test-products.xml
+                            '''
+                        }
+                    }
+                }
+
+                // ================= ROBOT FRAMEWORK =================
 
                 stage('Robot Framework Tests') {
                     steps {
@@ -110,7 +132,8 @@ pipeline {
 
                 // Selenium
                 archiveArtifacts artifacts: "${SELENIUM_REPORT_DIR}/**", allowEmptyArchive: true
-                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/selenium-results.xml"
+                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/test-sauce-demo.xml"
+                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/test-products.xml"
 
                 // Robot Framework
                 archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
