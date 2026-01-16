@@ -6,49 +6,43 @@ pipeline {
     }
 
     environment {
-        PLAYWRIGHT_JSON_DIR = 'reports\\playwright-json'
-        SELENIUM_JSON_DIR  = 'reports\\selenium-json'
-        ROBOT_XML_DIR      = 'reports\\robot-xml'
-        GLOBAL_HTML        = 'reports\\global-test-report.html'
+        PLAYWRIGHT_REPORT_DIR = 'reports/playwright'
+        SELENIUM_REPORT_DIR  = 'reports/selenium'
+        ROBOT_REPORT_DIR     = 'reports/robot'
     }
 
     stages {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out code...'
                 checkout scm
             }
         }
 
-        stage('Prepare Directories') {
+        stage('Prepare Reports Directory') {
             steps {
-                echo 'Creating reports directories...'
-                bat """
-                if not exist reports mkdir reports
-                if not exist ${PLAYWRIGHT_JSON_DIR} mkdir ${PLAYWRIGHT_JSON_DIR}
-                if not exist ${SELENIUM_JSON_DIR} mkdir ${SELENIUM_JSON_DIR}
-                if not exist ${ROBOT_XML_DIR} mkdir ${ROBOT_XML_DIR}
-                if not exist reports\\global-html mkdir reports\\global-html
-                """
+                echo 'Preparing reports directories...'
+                bat 'if not exist reports mkdir reports'
+                bat 'if not exist reports\\playwright mkdir reports\\playwright'
+                bat 'if not exist reports\\selenium mkdir reports\\selenium'
+                bat 'if not exist reports\\robot mkdir reports\\robot'
             }
         }
 
         stage('Install Dependencies') {
             parallel {
+
                 stage('Node & Playwright') {
                     steps {
-                        echo 'Installing Node & Playwright dependencies...'
                         bat 'npm install'
                         bat 'npx playwright install'
                     }
                 }
+
                 stage('Python Dependencies') {
                     steps {
-                        echo 'Installing Python dependencies...'
                         bat 'py -m pip install --upgrade pip'
                         bat 'py -m pip install -r requirements.txt'
-                        bat 'py -m pip install allure-pytest allure-robotframework'
                     }
                 }
             }
@@ -57,33 +51,66 @@ pipeline {
         stage('Run Tests') {
             parallel {
 
-                stage('Playwright Tests') {
+                // ================= PLAYWRIGHT =================
+
+                stage('Playwright - Checkout') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
-                            npx playwright test playwright_tests/paiement_process.spec.ts --output=${PLAYWRIGHT_JSON_DIR}\\paiement_process
-                            npx playwright test playwright_tests/product-filter.spec.ts --output=${PLAYWRIGHT_JSON_DIR}\\product_filter
+                            npx playwright test playwright_tests/paiement_process.spec.ts ^
+                            --reporter=junit ^
+                            --output=${PLAYWRIGHT_REPORT_DIR}/checkout
                             """
                         }
                     }
                 }
 
-                stage('Selenium Tests') {
+                stage('Playwright - Product Filter') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
-                            py -m pytest selenium_tests/TestSauceDemo.py --alluredir=${SELENIUM_JSON_DIR}\\TestSauceDemo
-                            py -m pytest selenium_tests/Tests_Check_Products.py --alluredir=${SELENIUM_JSON_DIR}\\CheckProducts
+                            npx playwright test playwright_tests/product-filter.spec.ts ^
+                            --reporter=junit ^
+                            --output=${PLAYWRIGHT_REPORT_DIR}/product-filter
                             """
                         }
                     }
                 }
+
+                // ================= SELENIUM =================
+
+                stage('Selenium - TestSauceDemo') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            bat '''
+                            py -m pytest selenium_tests/TestSauceDemo.py ^
+                            --junitxml=reports/selenium/test-sauce-demo.xml
+                            '''
+                        }
+                    }
+                }
+
+                stage('Selenium - Check Products') {
+                    steps {
+                        catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                            bat '''
+                            py -m pytest selenium_tests/Tests_Check_Products.py ^
+                            --junitxml=reports/selenium/test-products.xml
+                            '''
+                        }
+                    }
+                }
+
+                // ================= ROBOT FRAMEWORK =================
 
                 stage('Robot Framework Tests') {
                     steps {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
-                            py -m robot --listener allure_robotframework --outputdir ${ROBOT_XML_DIR} robot_tests
+                            py -m robot ^
+                            --outputdir ${ROBOT_REPORT_DIR}/output ^
+                            --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
+                            robot_tests
                             """
                         }
                     }
@@ -91,35 +118,33 @@ pipeline {
             }
         }
 
-        stage('Generate Global HTML Report') {
+        stage('Archive Artifacts & Publish Reports') {
             steps {
-                echo 'Generating global HTML report...'
+                echo 'Archiving artifacts and publishing test results...'
 
-                // Merge all results and create one HTML page
-                bat """
-                echo ^<html^>^<head^>^<title^>Test Report^</title^>^</head^>^<body^>^<h1^>Global Test Report^</h1^> > ${GLOBAL_HTML}
-                echo ^<h2^>Playwright Tests^</h2^> >> ${GLOBAL_HTML}
-                dir /b ${PLAYWRIGHT_JSON_DIR} >> ${GLOBAL_HTML}
-                echo ^<h2^>Selenium Tests^</h2^> >> ${GLOBAL_HTML}
-                dir /b ${SELENIUM_JSON_DIR} >> ${GLOBAL_HTML}
-                echo ^<h2^>Robot Framework Tests^</h2^> >> ${GLOBAL_HTML}
-                dir /b ${ROBOT_XML_DIR} >> ${GLOBAL_HTML}
-                echo ^</body^>^</html^> >> ${GLOBAL_HTML}
-                """
-            }
-        }
+                // Playwright Checkout
+                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/checkout/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/checkout/**/junit.xml"
 
-        stage('Archive Report') {
-            steps {
-                echo "Archiving global HTML report..."
-                archiveArtifacts artifacts: "${GLOBAL_HTML}", allowEmptyArchive: true
+                // Playwright Product Filter
+                archiveArtifacts artifacts: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${PLAYWRIGHT_REPORT_DIR}/product-filter/**/junit.xml"
+
+                // Selenium
+                archiveArtifacts artifacts: "${SELENIUM_REPORT_DIR}/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/test-sauce-demo.xml"
+                junit allowEmptyResults: true, testResults: "${SELENIUM_REPORT_DIR}/test-products.xml"
+
+                // Robot Framework
+                archiveArtifacts artifacts: "${ROBOT_REPORT_DIR}/**", allowEmptyArchive: true
+                junit allowEmptyResults: true, testResults: "${ROBOT_REPORT_DIR}/output/xunit.xml"
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finished. Open ${GLOBAL_HTML} for the combined test report."
+            echo 'Pipeline finished. Check reports/ directory for all artifacts and test results.'
         }
     }
 }
