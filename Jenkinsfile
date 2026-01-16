@@ -42,9 +42,10 @@ pipeline {
                 }
                 stage('Python Dependencies') {
                     steps {
+                        // ✅ Fixed: Removed robotframework-allure
                         bat 'py -m pip install --upgrade pip'
                         bat 'py -m pip install -r requirements.txt'
-                        bat 'py -m pip install allure-pytest robotframework-allure'
+                        bat 'py -m pip install allure-pytest'
                     }
                 }
             }
@@ -112,13 +113,10 @@ pipeline {
                         catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
                             bat """
                             py -m robot ^
-                            --outputdir ${ROBOT_REPORT_DIR}/output ^
-                            --xunit ${ROBOT_REPORT_DIR}/output/xunit.xml ^
                             --listener allure_robotframework.listener:AllureListener ^
+                            --outputdir reports/allure/robot ^
                             robot_tests
                             """
-                            // Copy Robot Allure results to Allure folder
-                            bat 'xcopy /s /y reports\\robot\\output\\* reports\\allure\\robot\\'
                         }
                     }
                 }
